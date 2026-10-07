@@ -16,6 +16,29 @@ const mode = process.argv[2] === "dev" ? "dev" : "start";
 const APP_PORT = Number(process.env.PORT || 3000);
 const HTTPS_PORT = Number(process.env.HTTPS_PORT || 3443);
 
+/** Is a TCP port already in use on this machine? */
+function portInUse(port) {
+  return new Promise((resolve) => {
+    const s = net.connect({ port, host: "127.0.0.1" });
+    s.on("connect", () => { s.destroy(); resolve(true); });
+    s.on("error", () => { s.destroy(); resolve(false); });
+  });
+}
+
+// Fail fast with a clear message if a previous run is still using the ports.
+for (const port of [APP_PORT, HTTPS_PORT]) {
+  if (await portInUse(port)) {
+    console.error(
+      `\n[serve-lan] Port ${port} is already in use — another POS is probably still running.\n` +
+        `Close that window, or free the port and try again:\n` +
+        (process.platform === "win32"
+          ? `  Windows:  for /f "tokens=5" %a in ('netstat -ano ^| findstr :${port}') do taskkill /F /PID %a\n`
+          : `  Mac/Linux:  lsof -tiTCP:${port} -sTCP:LISTEN | xargs kill -9\n`)
+    );
+    process.exit(1);
+  }
+}
+
 function lanIp() {
   const ifaces = os.networkInterfaces();
   let fallback = "";
