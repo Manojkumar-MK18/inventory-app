@@ -1,0 +1,15 @@
+node_modules/
+.next/
+out/
+build/
+.env
+.env.*
+!.env.example
+*.log
+.DS_Store
+coverage/
+backups/
+dist/
+pos-build.zip
+tsconfig.tsbuildinfo
+next-env.d.ts

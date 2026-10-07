@@ -1,0 +1,104 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --background: #f6f7fb;   /* soft app background */
+  --surface: #ffffff;      /* cards / panels */
+  --foreground: #111827;   /* main text (slate-900) */
+  --muted: #6b7280;        /* secondary text */
+  --border: #e9eaf0;       /* hairline borders */
+  --brand: #4f46e5;        /* indigo-600 accent */
+  --brand-ink: #4338ca;    /* indigo-700 */
+  --ring: #c7d2fe;         /* focus ring (indigo-200) */
+}
+
+html {
+  -webkit-text-size-adjust: 100%;
+}
+
+body {
+  background: var(--background);
+  color: var(--foreground);
+  font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  font-feature-settings: "cv05", "ss01";
+}
+
+/* Clear, consistent focus ring for keyboard users across the app */
+*:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 3px var(--ring);
+  border-radius: 8px;
+}
+
+/* Inputs & selects: softer, friendlier, bigger tap target, brand focus */
+input:not([type="checkbox"]):not([type="radio"]),
+select,
+textarea {
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+input:not([type="checkbox"]):not([type="radio"]):focus,
+select:focus,
+textarea:focus {
+  border-color: var(--brand) !important;
+  box-shadow: 0 0 0 3px var(--ring);
+  outline: none;
+}
+
+/* Buttons and links feel responsive */
+button, a {
+  transition: background-color 0.15s ease, color 0.15s ease, box-shadow 0.15s ease, opacity 0.15s ease, transform 0.05s ease;
+}
+button:not(:disabled):active {
+  transform: translateY(0.5px);
+}
+
+::selection {
+  background: var(--ring);
+  color: var(--brand-ink);
+}
+
+/* Nicer, slim scrollbars */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: #cbd0dc transparent;
+}
+*::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+*::-webkit-scrollbar-thumb {
+  background: #cbd0dc;
+  border-radius: 999px;
+  border: 2px solid transparent;
+  background-clip: content-box;
+}
+*::-webkit-scrollbar-thumb:hover {
+  background: #aeb4c4;
+  background-clip: content-box;
+}
+
+/* Thermal receipt printing: show only #receipt, sized to 80mm. */
+@media print {
+  body * {
+    visibility: hidden;
+  }
+  #receipt,
+  #receipt * {
+    visibility: visible;
+  }
+  #receipt {
+    position: absolute;
+    left: 0;
+    top: 0;
+  }
+  .no-print {
+    display: none !important;
+  }
+  @page {
+    size: 80mm auto;
+    margin: 4mm;
+  }
+}
