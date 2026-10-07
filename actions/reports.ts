@@ -217,6 +217,8 @@ export async function getFullReport(fromYmd: string, toYmd: string): Promise<Ful
       { label: "Period", value: `${fromYmd} to ${toYmd}` },
       { label: "Total sales (money received)", value: `₹${rupees(report.totalSales)}` },
       { label: "Discount given to customers", value: `₹${rupees(report.totalDiscount)}` },
+      { label: "Returns (money given back)", value: `₹${rupees(report.returns)}` },
+      { label: "Net sales (after returns)", value: `₹${rupees(report.totalSales - report.returns)}` },
       { label: "Number of bills", value: String(report.billCount) },
       { label: "Cost of goods sold (buy price)", value: `₹${rupees(report.costOfGoods)}` },
       { label: "Profit from selling goods", value: `₹${rupees(report.grossProfit)}` },

@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { IndianRupee, Receipt, ShoppingCart, Plus, TrendingUp, Trophy, PackageX } from "lucide-react";
+import { IndianRupee, ShoppingCart, Plus, TrendingUp, Trophy, PackageX, RotateCcw } from "lucide-react";
 import { getDashboardStats } from "@/actions/dashboard";
 import { formatINR } from "@/lib/money";
 import { TrendChart, PaymentDonut, CategoryBar, HoursBar } from "@/components/dashboard/Charts";
@@ -26,9 +26,13 @@ export default async function DashboardPage() {
 
       {/* KPIs */}
       <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
-        <Stat icon={<IndianRupee size={18} />} tone="green" label="Today's sales" value={formatINR(s.todaySales)} sub={`${s.todayBills} bill${s.todayBills === 1 ? "" : "s"} today`} />
-        <Stat icon={<TrendingUp size={18} />} tone="indigo" label="This month" value={formatINR(s.monthSales)} sub="total sales" />
-        <Stat icon={<Receipt size={18} />} tone="slate" label="Average bill" value={formatINR(s.avgBill)} sub="this month" />
+        <Stat icon={<IndianRupee size={18} />} tone="green" label="Today's sales" value={formatINR(s.todaySales)}
+          sub={`${s.todayBills} bill${s.todayBills === 1 ? "" : "s"}${s.todayReturns > 0 ? ` · ${formatINR(s.todayReturns)} returned` : " today"}`} />
+        <Stat icon={<TrendingUp size={18} />} tone="indigo" label="This month" value={formatINR(s.monthSales)}
+          sub={s.monthReturns > 0 ? `${formatINR(s.monthReturns)} returned this month` : "total sales"} />
+        <Link href="/returns" className="block">
+          <Stat icon={<RotateCcw size={18} />} tone={s.monthReturns > 0 ? "red" : "slate"} label="Returns (this month)" value={formatINR(s.monthReturns)} sub={`${formatINR(s.todayReturns)} today`} />
+        </Link>
         <Link href="/products" className="block">
           <Stat icon={<PackageX size={18} />} tone={s.lowStock > 0 ? "amber" : "slate"} label="Low stock" value={String(s.lowStock)} sub={s.lowStock > 0 ? "items to buy soon" : "all stocked"} />
         </Link>
@@ -126,6 +130,7 @@ const TONES: Record<string, string> = {
   indigo: "bg-indigo-50 text-indigo-600",
   slate: "bg-gray-100 text-gray-600",
   amber: "bg-amber-50 text-amber-600",
+  red: "bg-red-50 text-red-600",
 };
 
 function Stat({ icon, label, value, sub, tone = "slate" }: { icon: React.ReactNode; label: string; value: string; sub?: string; tone?: string }) {

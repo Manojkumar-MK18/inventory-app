@@ -6,6 +6,7 @@ import { connectDB } from "@/lib/db";
 import { SaleModel } from "@/models/Sale";
 import { ProductModel } from "@/models/Product";
 import { CustomerModel } from "@/models/Customer";
+import { ReturnModel } from "@/models/Return";
 
 const IST_MS = 5.5 * 60 * 60 * 1000;
 const pad = (n: number) => String(n).padStart(2, "0");
@@ -41,7 +42,9 @@ function hourLabel(h: number): string {
 export interface DashboardStats {
   todaySales: number;
   todayBills: number;
+  todayReturns: number; // paise refunded today
   monthSales: number;
+  monthReturns: number; // paise refunded this month
   totalProducts: number;
   lowStock: number;
   avgBill: number;
@@ -70,7 +73,7 @@ export async function getDashboardStats(): Promise<DashboardStats> {
 
   const monthMatch = { businessId: bId, status: "ISSUED", date: { $gte: monthStart } };
 
-  const [today, month, totalProducts, lowStock, recent, daily, top, lowItems, payMix, cats, hours, recv] =
+  const [today, month, totalProducts, lowStock, recent, daily, top, lowItems, payMix, cats, hours, recv, todayRet, monthRet] =
     await Promise.all([
       SaleModel.aggregate([
         { $match: { businessId: bId, status: "ISSUED", date: { $gte: todayStart } } },
@@ -124,6 +127,15 @@ export async function getDashboardStats(): Promise<DashboardStats> {
         { $match: { businessId: bId } },
         { $group: { _id: null, total: { $sum: "$balanceDue" } } },
       ]),
+      // returns refunded today / this month
+      ReturnModel.aggregate([
+        { $match: { businessId: bId, date: { $gte: todayStart } } },
+        { $group: { _id: null, total: { $sum: "$totalRefund" } } },
+      ]),
+      ReturnModel.aggregate([
+        { $match: { businessId: bId, date: { $gte: monthStart } } },
+        { $group: { _id: null, total: { $sum: "$totalRefund" } } },
+      ]),
     ]);
 
   // 14-day trend, filling gaps
@@ -156,6 +168,8 @@ export async function getDashboardStats(): Promise<DashboardStats> {
   return {
     todaySales: today[0]?.total ?? 0,
     todayBills: today[0]?.count ?? 0,
+    todayReturns: todayRet[0]?.total ?? 0,
+    monthReturns: monthRet[0]?.total ?? 0,
     monthSales: monthTotal,
     totalProducts,
     lowStock,
