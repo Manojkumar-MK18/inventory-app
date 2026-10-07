@@ -176,3 +176,50 @@ A working first version is now in the codebase (no FastAPI, all Next.js):
 **For the live camera** you still need the one-time **HTTPS (mkcert)** step from §4 — until then, the scanner page's **type-a-barcode** box works over plain http.
 
 Smoke-tested: routes build and respond (`/scanner` 200; unpaired scan → 409; missing barcode → 400). End-to-end camera flow needs a phone on the LAN + the HTTPS step.
+
+---
+
+## 11. Turning on HTTPS so the phone camera works (free)
+
+Symptom: the scanner page says **"Camera is blocked because this page is not HTTPS."**
+Reason: phone browsers only allow the camera on `https://`. We run a tiny HTTPS
+front (`scripts/https-proxy.mjs`, zero dependencies) that forwards to the app.
+
+The app runs on `http://…:3000` as usual; the HTTPS front runs on `:3443` and
+the phone opens `https://<pc-ip>:3443/scanner`.
+
+### Step 1 — make a certificate (pick ONE)
+
+**Option A — mkcert (recommended: no browser warning).**
+```
+# install mkcert once (Windows: `choco install mkcert` or download the .exe; Mac: `brew install mkcert`)
+mkcert -install
+mkcert -cert-file certs/cert.pem -key-file certs/key.pem <your-lan-ip> localhost 127.0.0.1
+```
+Then install the mkcert **root CA on the phone** once (mkcert prints where the
+`rootCA.pem` is — email/AirDrop it to the phone and open it to trust it). After
+this the phone shows the camera with **no warning**.
+
+**Option B — self-signed with openssl (works now, one warning tap).**
+```
+mkdir -p certs
+openssl req -x509 -newkey rsa:2048 -nodes -keyout certs/key.pem -out certs/cert.pem -days 825 \
+  -subj "/CN=<your-lan-ip>" -addext "subjectAltName=IP:<your-lan-ip>,DNS:localhost,IP:127.0.0.1"
+```
+The phone will show a one-time **"Not secure — proceed"** screen; tap through it
+and the camera works.
+
+### Step 2 — run the HTTPS front
+With the app already running on port 3000, in a second terminal:
+```
+npm run https
+```
+(Windows shop PC: run it the same way, or wrap it in a `.bat`/NSSM service like `start-pos.bat`.)
+
+### Step 3 — open it on the phone
+On the phone (same Wi-Fi): `https://<pc-ip>:3443/scanner`
+The POS "Phone scan" panel's QR/link already points at the right address — just
+remember it's the **:3443 https** address when the HTTPS front is running.
+
+> The `certs/` folder is gitignored (never commit private keys).
+> **No HTTPS?** The scanner page's **type-a-barcode** box still works over plain http.

@@ -13,3 +13,4 @@ dist/
 pos-build.zip
 tsconfig.tsbuildinfo
 next-env.d.ts
+certs/
