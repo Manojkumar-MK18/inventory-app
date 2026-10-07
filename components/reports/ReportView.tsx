@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useTransition } from "react";
-import { TrendingUp, IndianRupee, Receipt, Boxes, Wallet, Download } from "lucide-react";
+import { TrendingUp, IndianRupee, Receipt, Boxes, Wallet, Download, RotateCcw } from "lucide-react";
 import { getReport, getFullReport, type ReportData } from "@/actions/reports";
 import { formatINR } from "@/lib/money";
 import { printReportPdf } from "@/lib/reportPdf";
@@ -56,6 +56,7 @@ export function ReportView({ initial }: { initial: ReportData }) {
       <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
         <Stat icon={<Receipt size={18} />} tone={data.netProfit >= 0 ? "green" : "red"} label="Final profit" value={formatINR(data.netProfit)} sub="profit from sales − expenses" />
         <Stat icon={<Wallet size={18} />} tone="slate" label="Discount given" value={formatINR(data.totalDiscount)} sub="total discount to customers" />
+        <Stat icon={<RotateCcw size={18} />} tone={data.returns > 0 ? "red" : "slate"} label="Returns" value={formatINR(data.returns)} sub="money given back for returns" />
         <Stat icon={<Boxes size={18} />} tone="slate" label="Stock value now" value={formatINR(data.stockValue)} sub="worth of unsold goods in your shop" />
         {data.usesGst && (
           <Stat icon={<Receipt size={18} />} tone="slate" label="GST collected" value={formatINR(data.gstCollected)} sub="tax to pay the government" />
@@ -76,6 +77,9 @@ export function ReportView({ initial }: { initial: ReportData }) {
           )}
           {data.totalDiscount === 0 && (
             <Row n="1" a="Money you got from selling (Total sales)" b={formatINR(data.totalSales)} />
+          )}
+          {data.returns > 0 && (
+            <Row n="−" a="Returns (money you gave back for returned items)" b={`− ${formatINR(data.returns)}`} tone="red" />
           )}
           {data.usesGst && (
             <Row n="−" a="GST you collected (you pay this to the government)" b={`− ${formatINR(data.gstCollected)}`} />

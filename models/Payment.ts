@@ -5,7 +5,7 @@ export const PAYMENT_METHODS = ["CASH", "UPI", "CARD", "CREDIT"] as const;
 
 const paymentSchema = new Schema(
   {
-    refType: { type: String, enum: ["SALE", "PURCHASE", "CUSTOMER_DUE", "SUPPLIER_DUE"], required: true },
+    refType: { type: String, enum: ["SALE", "PURCHASE", "CUSTOMER_DUE", "SUPPLIER_DUE", "RETURN"], required: true },
     refId: { type: Schema.Types.ObjectId },
     method: { type: String, enum: PAYMENT_METHODS, required: true },
     amount: { type: Number, required: true }, // paise

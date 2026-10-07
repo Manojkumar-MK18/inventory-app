@@ -4,6 +4,7 @@ import mongoose from "mongoose";
 import { getContext } from "@/lib/context";
 import { connectDB } from "@/lib/db";
 import { SaleModel } from "@/models/Sale";
+import { ReturnModel } from "@/models/Return";
 import { BusinessModel } from "@/models/Business";
 import { ProductModel } from "@/models/Product";
 import { ExpenseModel } from "@/models/Expense";
@@ -31,11 +32,12 @@ function defaultRange(): { from: Date; to: Date } {
 export interface ReportData {
   from: string;
   to: string;
-  totalSales: number; // money actually received (after discount)
+  totalSales: number; // money billed (after discount) — gross, before returns
   totalDiscount: number; // discount given on sales (item + whole-bill)
+  returns: number; // money refunded for returned items in the period
   billCount: number;
-  costOfGoods: number; // what the sold items cost to buy
-  grossProfit: number; // sales value of goods - cost of goods sold
+  costOfGoods: number; // cost of goods sold, net of returned goods' cost
+  grossProfit: number; // (sales − returns) − cost of goods (net)
   gstCollected: number;
   expenses: number;
   netProfit: number; // grossProfit - expenses
@@ -102,14 +104,23 @@ export async function getReport(fromYmd?: string, toYmd?: string): Promise<Repor
     { $match: match },
     { $group: { _id: null, billDiscount: { $sum: { $ifNull: ["$billDiscount", 0] } } } },
   ]);
-  const costOfGoods = profitAgg[0]?.cost ?? 0;
+  // Returns in the period: money refunded + cost of the goods that came back.
+  const returnAgg = await ReturnModel.aggregate([
+    { $match: { businessId: bId, date: { $gte: range.from, $lte: range.to } } },
+    { $unwind: "$items" },
+    { $group: { _id: null, refund: { $sum: "$items.refundTotal" }, cost: { $sum: { $multiply: ["$items.costAtSale", "$items.qty"] } } } },
+  ]);
+  const returns = returnAgg[0]?.refund ?? 0;
+  const returnedCost = returnAgg[0]?.cost ?? 0;
+
+  const grossCost = profitAgg[0]?.cost ?? 0;
+  const costOfGoods = Math.max(0, grossCost - returnedCost); // net of returned goods
   const totalDiscount = (profitAgg[0]?.itemDiscount ?? 0) + (billDiscAgg[0]?.billDiscount ?? 0);
   const totalSales = totals[0]?.totalSales ?? 0;
   const gstCollected = totals[0]?.gst ?? 0;
   const expensesTotal = expenses[0]?.total ?? 0;
-  // Profit from sales = money received − GST (not yours) − what the goods cost.
-  // Using totalSales keeps the on-screen subtraction exact for the shopkeeper.
-  const grossProfit = totalSales - gstCollected - costOfGoods;
+  // Profit from goods = (money billed − returns) − GST (not yours) − net cost of goods.
+  const grossProfit = totalSales - returns - gstCollected - costOfGoods;
 
   const biz = await BusinessModel.findById(bId).lean<{ gstType: string }>();
   const usesGst = biz?.gstType === "REGULAR" || gstCollected > 0;
@@ -141,6 +152,7 @@ export async function getReport(fromYmd?: string, toYmd?: string): Promise<Repor
     to: range.to.toISOString(),
     totalSales,
     totalDiscount,
+    returns,
     billCount: totals[0]?.billCount ?? 0,
     costOfGoods,
     grossProfit,

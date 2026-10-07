@@ -4,7 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
   LayoutDashboard, ShoppingCart, Package, Truck,
-  ReceiptText, Users, BarChart3, Settings, Wallet, Factory, CalendarCheck,
+  ReceiptText, Users, BarChart3, Settings, Wallet, Factory, CalendarCheck, RotateCcw,
 } from "lucide-react";
 import { Copyright } from "./Brand";
 
@@ -15,6 +15,7 @@ const SECTIONS = [
       { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
       { href: "/pos", label: "New Bill", icon: ShoppingCart },
       { href: "/sales", label: "Sales", icon: ReceiptText },
+      { href: "/returns", label: "Returns", icon: RotateCcw },
     ],
   },
   {

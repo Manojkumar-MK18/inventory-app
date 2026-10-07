@@ -219,11 +219,16 @@ export function saleRepo(ctx: Ctx, cfg: BusinessConfig) {
           const items = input.items.map((item, idx) => {
             const p = byId.get(item.productId)!;
             const l = bill.lines[idx];
+            const variant = item.variantLabel ? (p.variants ?? []).find((x: any) => x.label === item.variantLabel) : null;
+            const barcode = variant?.barcode || p.barcode || "";
             return {
               productId: p._id,
               name: item.variantLabel ? `${p.name} (${item.variantLabel})` : p.name,
               hsn: p.hsn,
+              variantLabel: item.variantLabel ?? "",
+              barcode,
               qty: item.qty,
+              returnedQty: 0,
               price: priceFor(item, p),
               discount: (item.discount ?? 0) * item.qty,
               taxRate: cfg.gstType === "REGULAR" ? p.taxRate : 0,

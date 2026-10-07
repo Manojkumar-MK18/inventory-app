@@ -7,7 +7,10 @@ const saleItemSchema = new Schema(
     productId: { type: Schema.Types.ObjectId, ref: "Product", required: true },
     name: String, // snapshot
     hsn: String, // snapshot
+    variantLabel: { type: String, default: "" }, // size, snapshot (for returns + stock)
+    barcode: { type: String, default: "" }, // snapshot — lets returns find the item by scan
     qty: { type: Number, required: true },
+    returnedQty: { type: Number, default: 0 }, // how many of this line were returned
     price: Number, // paise, snapshot
     discount: { type: Number, default: 0 }, // paise
     taxRate: Number, // snapshot
