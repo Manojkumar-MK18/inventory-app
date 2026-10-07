@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Maximize, Minimize, ShoppingCart, Smartphone, X } from "lucide-react";
+import { Maximize, Minimize, ShoppingCart, Smartphone, X, Copy, Check } from "lucide-react";
 import type { ProductDTO } from "@/actions/products";
 import { createSale, type SavedSale } from "@/actions/sales";
 import { computeBill, type GstType } from "@/lib/tax";
@@ -79,6 +79,10 @@ export function PosScreen({ products, businessName, gstin, gstType, pricesInclud
   const [scanConnected, setScanConnected] = useState(false);
   const [scanToast, setScanToast] = useState("");
   const [scanUrl, setScanUrl] = useState("");
+  const [lanIps, setLanIps] = useState<string[]>([]);
+  const [lanPick, setLanPick] = useState(0);
+  const [copied, setCopied] = useState(false);
+  const [qrDataUrl, setQrDataUrl] = useState("");
 
   useEffect(() => {
     setNow(new Date());
@@ -86,9 +90,40 @@ export function PosScreen({ products, businessName, gstin, gstType, pricesInclud
     return () => clearInterval(t);
   }, []);
 
+  // Build the scanner URL the PHONE can reach: use the PC's LAN IP (not localhost).
   useEffect(() => {
-    setScanUrl(`${window.location.origin}/scanner?pair=${pairCode}`);
-  }, [pairCode]);
+    fetch("/api/lan-ip")
+      .then((r) => r.json())
+      .then((d) => setLanIps(Array.isArray(d.ips) ? d.ips : []))
+      .catch(() => setLanIps([]));
+  }, []);
+
+  useEffect(() => {
+    const host = window.location.hostname; // what the cashier actually opened
+    const port = window.location.port ? `:${window.location.port}` : "";
+    const proto = window.location.protocol;
+    // Prefer a real LAN IP; fall back to the host the POS was opened on.
+    const onLocalhost = host === "localhost" || host === "127.0.0.1";
+    const ip = lanIps[lanPick] ?? (onLocalhost ? "" : host);
+    const base = ip ? `${proto}//${ip}${port}` : window.location.origin;
+    setScanUrl(`${base}/scanner?pair=${pairCode}`);
+  }, [pairCode, lanIps, lanPick]);
+
+  // Render a QR of the scanner URL so the phone can just scan to open.
+  useEffect(() => {
+    if (!scanUrl) return setQrDataUrl("");
+    import("qrcode").then((QR) =>
+      QR.toDataURL(scanUrl, { margin: 1, width: 176 }).then(setQrDataUrl).catch(() => setQrDataUrl(""))
+    );
+  }, [scanUrl]);
+
+  async function copyScanUrl() {
+    try {
+      await navigator.clipboard.writeText(scanUrl);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1800);
+    } catch { /* clipboard blocked; user can select manually */ }
+  }
 
   // Auto-hide the little scan toast.
   useEffect(() => {
@@ -393,19 +428,59 @@ export function PosScreen({ products, businessName, gstin, gstType, pricesInclud
             </div>
             <button onClick={() => setShowScan(false)} className="text-gray-400 hover:text-gray-600"><X size={18} /></button>
           </div>
-          <ol className="mt-3 flex list-decimal flex-col gap-1.5 pl-5 text-sm text-gray-600">
-            <li>On the phone (same Wi-Fi), open this page: <span className="break-all font-medium text-gray-800">{scanUrl || "…"}</span></li>
-            <li>It fills the pair code automatically. If asked, enter <span className="font-mono font-bold tracking-widest text-gray-900">{pairCode}</span></li>
-            <li>Tap <b>Start camera</b> and scan a barcode — items appear here instantly.</li>
-          </ol>
-          <div className="mt-3 flex flex-wrap items-center gap-3">
-            <span className="rounded-lg bg-gray-100 px-3 py-2 text-sm">Pair code: <b className="font-mono tracking-widest">{pairCode}</b></span>
-            <span className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-medium ${scanConnected ? "bg-emerald-50 text-emerald-700" : "bg-gray-100 text-gray-500"}`}>
-              <span className={`h-2 w-2 rounded-full ${scanConnected ? "bg-emerald-500" : "bg-gray-400"}`} /> {scanConnected ? "Ready for scans" : "Connecting…"}
-            </span>
-            {scanUrl && <a href={scanUrl} target="_blank" rel="noreferrer" className="text-sm text-brand-600 underline">Open scanner (this device)</a>}
+          <div className="mt-3 flex flex-col gap-4 sm:flex-row">
+            {/* QR to scan with the phone */}
+            <div className="flex flex-col items-center gap-2">
+              {qrDataUrl ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img src={qrDataUrl} alt="Scan to open the scanner" className="h-44 w-44 rounded-xl border border-gray-200 bg-white p-1.5" />
+              ) : (
+                <div className="flex h-44 w-44 items-center justify-center rounded-xl border border-gray-200 text-xs text-gray-400">QR…</div>
+              )}
+              <p className="text-xs font-medium text-gray-500">Scan this with the phone camera</p>
+            </div>
+
+            {/* Steps + URL + copy */}
+            <div className="min-w-0 flex-1">
+              <ol className="flex list-decimal flex-col gap-1.5 pl-5 text-sm text-gray-600">
+                <li>On the phone (same Wi-Fi), <b>scan the QR</b> — or open the link below.</li>
+                <li>The pair code fills in automatically. If asked, enter <span className="font-mono font-bold tracking-widest text-gray-900">{pairCode}</span>.</li>
+                <li>Tap <b>Start camera</b> and scan a barcode — items appear here instantly.</li>
+              </ol>
+
+              <div className="mt-3">
+                <p className="mb-1 text-xs font-semibold uppercase tracking-wide text-gray-400">Scanner link (open on the phone)</p>
+                <div className="flex items-stretch gap-2">
+                  <input readOnly value={scanUrl} onFocus={(e) => e.currentTarget.select()}
+                    className="min-w-0 flex-1 rounded-lg border border-gray-300 bg-gray-50 px-3 py-2 text-sm" />
+                  <button type="button" onClick={copyScanUrl}
+                    className={`flex items-center gap-1.5 rounded-lg px-3 py-2 text-sm font-semibold text-white ${copied ? "bg-emerald-600" : "bg-gray-900 hover:bg-gray-800"}`}>
+                    {copied ? <Check size={15} /> : <Copy size={15} />} {copied ? "Copied" : "Copy"}
+                  </button>
+                </div>
+
+                {lanIps.length === 0 && (
+                  <p className="mt-1.5 text-xs text-amber-600">Couldn&apos;t detect this PC&apos;s Wi-Fi IP. If the phone can&apos;t open the link, make sure the app runs on the network (0.0.0.0) and both devices are on the same Wi-Fi.</p>
+                )}
+                {lanIps.length > 1 && (
+                  <label className="mt-1.5 flex items-center gap-2 text-xs text-gray-500">
+                    This PC has more than one network — pick the Wi-Fi one:
+                    <select value={lanPick} onChange={(e) => setLanPick(Number(e.target.value))} className="rounded-md border border-gray-300 px-2 py-1 text-xs">
+                      {lanIps.map((ip, i) => <option key={ip} value={i}>{ip}</option>)}
+                    </select>
+                  </label>
+                )}
+              </div>
+
+              <div className="mt-3 flex flex-wrap items-center gap-3">
+                <span className="rounded-lg bg-gray-100 px-3 py-2 text-sm">Pair code: <b className="font-mono tracking-widest">{pairCode}</b></span>
+                <span className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-medium ${scanConnected ? "bg-emerald-50 text-emerald-700" : "bg-gray-100 text-gray-500"}`}>
+                  <span className={`h-2 w-2 rounded-full ${scanConnected ? "bg-emerald-500" : "bg-gray-400"}`} /> {scanConnected ? "Ready for scans" : "Connecting…"}
+                </span>
+              </div>
+            </div>
           </div>
-          <p className="mt-2 text-xs text-gray-400">Camera needs HTTPS on the phone — see docs/WIRELESS-SCANNER.md for the one-time free setup. You can always type a barcode on the scanner page.</p>
+          <p className="mt-3 text-xs text-gray-400">Camera needs HTTPS on the phone — see docs/WIRELESS-SCANNER.md for the one-time free setup. You can always type a barcode on the scanner page.</p>
         </div>
       )}
 
