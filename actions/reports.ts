@@ -43,10 +43,39 @@ export interface ReportData {
   netProfit: number; // grossProfit - expenses
   stockValue: number; // current stock × cost
   usesGst: boolean; // true only for GST-registered shops (hide GST UI otherwise)
+  compare: PeriodMoney | null; // same metrics for the previous equal-length period
+  compareLabel: string; // e.g. "previous 7 days"
   gstByRate: { rate: number; taxable: number; tax: number }[];
   topProducts: { name: string; qty: number; revenue: number }[];
   dailySales: { label: string; total: number }[]; // sales per day over the period
   paymentMix: { method: string; total: number }[]; // how customers paid
+}
+
+export interface PeriodMoney {
+  totalSales: number;
+  returns: number;
+  costOfGoods: number;
+  grossProfit: number;
+  expenses: number;
+  netProfit: number;
+}
+
+/** The money numbers for a date range — used to compare against the previous period. */
+async function moneyMetrics(bId: mongoose.Types.ObjectId, from: Date, to: Date): Promise<PeriodMoney> {
+  const match = { businessId: bId, status: "ISSUED", date: { $gte: from, $lte: to } };
+  const [totals, sold, ret, exp] = await Promise.all([
+    SaleModel.aggregate([{ $match: match }, { $group: { _id: null, sales: { $sum: "$totals.grandTotal" }, gst: { $sum: { $add: ["$totals.cgst", "$totals.sgst", "$totals.igst"] } } } }]),
+    SaleModel.aggregate([{ $match: match }, { $unwind: "$items" }, { $group: { _id: null, cost: { $sum: { $multiply: ["$items.costAtSale", "$items.qty"] } } } }]),
+    ReturnModel.aggregate([{ $match: { businessId: bId, date: { $gte: from, $lte: to } } }, { $unwind: "$items" }, { $group: { _id: null, refund: { $sum: "$items.refundTotal" }, cost: { $sum: { $multiply: ["$items.costAtSale", "$items.qty"] } } } }]),
+    ExpenseModel.aggregate([{ $match: { businessId: bId, date: { $gte: from, $lte: to } } }, { $group: { _id: null, total: { $sum: "$amount" } } }]),
+  ]);
+  const sales = totals[0]?.sales ?? 0;
+  const gst = totals[0]?.gst ?? 0;
+  const returns = ret[0]?.refund ?? 0;
+  const costOfGoods = Math.max(0, (sold[0]?.cost ?? 0) - (ret[0]?.cost ?? 0));
+  const expenses = exp[0]?.total ?? 0;
+  const grossProfit = sales - returns - gst - costOfGoods;
+  return { totalSales: sales, returns, costOfGoods, grossProfit, expenses, netProfit: grossProfit - expenses };
 }
 
 export async function getReport(fromYmd?: string, toYmd?: string): Promise<ReportData> {
@@ -147,6 +176,14 @@ export async function getReport(fromYmd?: string, toYmd?: string): Promise<Repor
     .map((m) => ({ method: m, total: payMap.get(m) ?? 0 }))
     .filter((p) => p.total > 0);
 
+  // Previous equal-length period, for the % comparison on the cards.
+  const spanMs = range.to.getTime() - range.from.getTime();
+  const prevTo = new Date(range.from.getTime() - 1);
+  const prevFrom = new Date(prevTo.getTime() - spanMs);
+  const compare = await moneyMetrics(bId, prevFrom, prevTo);
+  const days = Math.max(1, Math.round(spanMs / 86400000));
+  const compareLabel = `previous ${days} day${days === 1 ? "" : "s"}`;
+
   return {
     from: range.from.toISOString(),
     to: range.to.toISOString(),
@@ -161,6 +198,8 @@ export async function getReport(fromYmd?: string, toYmd?: string): Promise<Repor
     netProfit: grossProfit - expensesTotal,
     stockValue: stock[0]?.value ?? 0,
     usesGst,
+    compare,
+    compareLabel,
     gstByRate: byRate.map((r: any) => ({ rate: r._id ?? 0, taxable: r.taxable, tax: r.tax })),
     topProducts: top.map((t: any) => ({ name: t._id, qty: t.qty, revenue: t.revenue })),
     dailySales,

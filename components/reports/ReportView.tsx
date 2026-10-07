@@ -46,18 +46,24 @@ export function ReportView({ initial }: { initial: ReportData }) {
         </button>
       </div>
 
-      {/* Money cards — plain words */}
+      {/* Money cards — plain words, with vs-previous-period % */}
       <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
-        <Stat icon={<IndianRupee size={18} />} tone="green" label="Total sales" value={formatINR(data.totalSales)} sub={`${data.billCount} bill${data.billCount === 1 ? "" : "s"} · money from selling`} />
-        <Stat icon={<Boxes size={18} />} tone="slate" label="Cost of goods sold" value={formatINR(data.costOfGoods)} sub="buy-price of only the items you sold" />
-        <Stat icon={<TrendingUp size={18} />} tone={data.grossProfit >= 0 ? "indigo" : "red"} label="Profit from sales" value={formatINR(data.grossProfit)} sub="sales − cost of goods" />
-        <Stat icon={<Wallet size={18} />} tone="slate" label="Other expenses" value={formatINR(data.expenses)} sub="rent, electricity, salary…" />
+        <Stat icon={<IndianRupee size={18} />} tone="green" label="Total sales" value={formatINR(data.totalSales)}
+          delta={<Delta cur={data.totalSales} prev={data.compare?.totalSales} label={data.compareLabel} />} sub={`${data.billCount} bill${data.billCount === 1 ? "" : "s"}`} />
+        <Stat icon={<Boxes size={18} />} tone="slate" label="Cost of goods sold" value={formatINR(data.costOfGoods)}
+          delta={<Delta cur={data.costOfGoods} prev={data.compare?.costOfGoods} label={data.compareLabel} goodWhenUp={false} />} sub="buy-price of items sold" />
+        <Stat icon={<TrendingUp size={18} />} tone={data.grossProfit >= 0 ? "indigo" : "red"} label="Profit from sales" value={formatINR(data.grossProfit)}
+          delta={<Delta cur={data.grossProfit} prev={data.compare?.grossProfit} label={data.compareLabel} />} sub="sales − cost of goods" />
+        <Stat icon={<Wallet size={18} />} tone="slate" label="Other expenses" value={formatINR(data.expenses)}
+          delta={<Delta cur={data.expenses} prev={data.compare?.expenses} label={data.compareLabel} goodWhenUp={false} />} sub="rent, electricity…" />
       </div>
       <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
-        <Stat icon={<Receipt size={18} />} tone={data.netProfit >= 0 ? "green" : "red"} label="Final profit" value={formatINR(data.netProfit)} sub="profit from sales − expenses" />
+        <Stat icon={<Receipt size={18} />} tone={data.netProfit >= 0 ? "green" : "red"} label="Final profit" value={formatINR(data.netProfit)}
+          delta={<Delta cur={data.netProfit} prev={data.compare?.netProfit} label={data.compareLabel} />} sub="after expenses" />
         <Stat icon={<Wallet size={18} />} tone="slate" label="Discount given" value={formatINR(data.totalDiscount)} sub="total discount to customers" />
-        <Stat icon={<RotateCcw size={18} />} tone={data.returns > 0 ? "red" : "slate"} label="Returns" value={formatINR(data.returns)} sub="money given back for returns" />
-        <Stat icon={<Boxes size={18} />} tone="slate" label="Stock value now" value={formatINR(data.stockValue)} sub="worth of unsold goods in your shop" />
+        <Stat icon={<RotateCcw size={18} />} tone={data.returns > 0 ? "red" : "slate"} label="Returns" value={formatINR(data.returns)}
+          delta={<Delta cur={data.returns} prev={data.compare?.returns} label={data.compareLabel} goodWhenUp={false} />} sub="money given back" />
+        <Stat icon={<Boxes size={18} />} tone="slate" label="Stock value now" value={formatINR(data.stockValue)} sub="worth of unsold goods" />
         {data.usesGst && (
           <Stat icon={<Receipt size={18} />} tone="slate" label="GST collected" value={formatINR(data.gstCollected)} sub="tax to pay the government" />
         )}
@@ -185,7 +191,18 @@ const TONES: Record<string, string> = {
   red: "bg-red-50 text-red-600",
 };
 
-function Stat({ icon, label, value, sub, tone = "slate" }: { icon: React.ReactNode; label: string; value: string; sub?: string; tone?: string }) {
+/** % change vs the previous period. Green/red depends on whether up is good. */
+function Delta({ cur, prev, label, goodWhenUp = true }: { cur: number; prev: number | undefined; label: string; goodWhenUp?: boolean }) {
+  if (prev === undefined || prev <= 0) return <span className="text-gray-400">no earlier data</span>;
+  const pct = Math.round(((cur - prev) / prev) * 1000) / 10;
+  const flat = pct === 0;
+  const up = pct > 0;
+  const color = flat ? "text-gray-400" : up === goodWhenUp ? "text-green-600" : "text-red-500";
+  const arrow = flat ? "→" : up ? "↑" : "↓";
+  return <span className={color}>{arrow} {Math.abs(pct)}% <span className="font-normal text-gray-400">vs {label}</span></span>;
+}
+
+function Stat({ icon, label, value, sub, delta, tone = "slate" }: { icon: React.ReactNode; label: string; value: string; sub?: string; delta?: React.ReactNode; tone?: string }) {
   return (
     <div className="rounded-xl border border-gray-200 bg-white p-4">
       <div className="flex items-center gap-3">
@@ -195,7 +212,8 @@ function Stat({ icon, label, value, sub, tone = "slate" }: { icon: React.ReactNo
           <p className="text-xl font-semibold leading-tight">{value}</p>
         </div>
       </div>
-      {sub && <p className="mt-2 text-xs text-gray-400">{sub}</p>}
+      {delta && <p className="mt-2 text-xs font-medium">{delta}</p>}
+      {sub && <p className={`${delta ? "mt-0.5" : "mt-2"} text-xs text-gray-400`}>{sub}</p>}
     </div>
   );
 }

@@ -43,6 +43,9 @@ export interface DashboardStats {
   todaySales: number;
   todayBills: number;
   todayReturns: number; // paise refunded today
+  salesChangePct: number | null; // today's sales vs yesterday (null = no prior data)
+  billsChangePct: number | null; // today's bills vs yesterday
+  monthChangePct: number | null; // this month's sales vs last month
   monthSales: number;
   monthReturns: number; // paise refunded this month
   totalProducts: number;
@@ -60,6 +63,12 @@ export interface DashboardStats {
 
 const LINE_REVENUE = { $add: ["$items.taxable", "$items.cgst", "$items.sgst", "$items.igst"] };
 
+/** % change of cur vs prev. null when there's no prior value to compare against. */
+function changePct(cur: number, prev: number): number | null {
+  if (prev <= 0) return null;
+  return Math.round(((cur - prev) / prev) * 1000) / 10; // 1 decimal
+}
+
 export async function getDashboardStats(): Promise<DashboardStats> {
   const ctx = await getContext();
   await connectDB();
@@ -70,10 +79,13 @@ export async function getDashboardStats(): Promise<DashboardStats> {
   monthStart.setUTCDate(1);
   const trendStart = new Date(todayStart.getTime() - 13 * 86400000);
   const weekStart = new Date(todayStart.getTime() - 6 * 86400000);
+  const yesterdayStart = new Date(todayStart.getTime() - 86400000);
+  const lastMonthStart = new Date(monthStart);
+  lastMonthStart.setUTCMonth(lastMonthStart.getUTCMonth() - 1);
 
   const monthMatch = { businessId: bId, status: "ISSUED", date: { $gte: monthStart } };
 
-  const [today, month, totalProducts, lowStock, recent, daily, top, lowItems, payMix, cats, hours, recv, todayRet, monthRet] =
+  const [today, month, totalProducts, lowStock, recent, daily, top, lowItems, payMix, cats, hours, recv, todayRet, monthRet, yday, lastMonth] =
     await Promise.all([
       SaleModel.aggregate([
         { $match: { businessId: bId, status: "ISSUED", date: { $gte: todayStart } } },
@@ -136,6 +148,16 @@ export async function getDashboardStats(): Promise<DashboardStats> {
         { $match: { businessId: bId, date: { $gte: monthStart } } },
         { $group: { _id: null, total: { $sum: "$totalRefund" } } },
       ]),
+      // yesterday (for the vs-yesterday comparison)
+      SaleModel.aggregate([
+        { $match: { businessId: bId, status: "ISSUED", date: { $gte: yesterdayStart, $lt: todayStart } } },
+        { $group: { _id: null, total: { $sum: "$totals.grandTotal" }, count: { $sum: 1 } } },
+      ]),
+      // last month (for the vs-last-month comparison)
+      SaleModel.aggregate([
+        { $match: { businessId: bId, status: "ISSUED", date: { $gte: lastMonthStart, $lt: monthStart } } },
+        { $group: { _id: null, total: { $sum: "$totals.grandTotal" } } },
+      ]),
     ]);
 
   // 14-day trend, filling gaps
@@ -169,6 +191,9 @@ export async function getDashboardStats(): Promise<DashboardStats> {
     todaySales: today[0]?.total ?? 0,
     todayBills: today[0]?.count ?? 0,
     todayReturns: todayRet[0]?.total ?? 0,
+    salesChangePct: changePct(today[0]?.total ?? 0, yday[0]?.total ?? 0),
+    billsChangePct: changePct(today[0]?.count ?? 0, yday[0]?.count ?? 0),
+    monthChangePct: changePct(monthTotal, lastMonth[0]?.total ?? 0),
     monthReturns: monthRet[0]?.total ?? 0,
     monthSales: monthTotal,
     totalProducts,

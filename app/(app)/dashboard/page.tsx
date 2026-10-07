@@ -27,9 +27,11 @@ export default async function DashboardPage() {
       {/* KPIs */}
       <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
         <Stat icon={<IndianRupee size={18} />} tone="green" label="Today's sales" value={formatINR(s.todaySales)}
-          sub={`${s.todayBills} bill${s.todayBills === 1 ? "" : "s"}${s.todayReturns > 0 ? ` · ${formatINR(s.todayReturns)} returned` : " today"}`} />
+          delta={<Delta pct={s.salesChangePct} suffix="vs yesterday" />}
+          sub={`${s.todayBills} bill${s.todayBills === 1 ? "" : "s"}${s.todayReturns > 0 ? ` · ${formatINR(s.todayReturns)} returned` : ""}`} />
         <Stat icon={<TrendingUp size={18} />} tone="indigo" label="This month" value={formatINR(s.monthSales)}
-          sub={s.monthReturns > 0 ? `${formatINR(s.monthReturns)} returned this month` : "total sales"} />
+          delta={<Delta pct={s.monthChangePct} suffix="vs last month" />}
+          sub={s.monthReturns > 0 ? `${formatINR(s.monthReturns)} returned` : undefined} />
         <Link href="/returns" className="block">
           <Stat icon={<RotateCcw size={18} />} tone={s.monthReturns > 0 ? "red" : "slate"} label="Returns (this month)" value={formatINR(s.monthReturns)} sub={`${formatINR(s.todayReturns)} today`} />
         </Link>
@@ -133,7 +135,17 @@ const TONES: Record<string, string> = {
   red: "bg-red-50 text-red-600",
 };
 
-function Stat({ icon, label, value, sub, tone = "slate" }: { icon: React.ReactNode; label: string; value: string; sub?: string; tone?: string }) {
+function Delta({ pct, suffix, goodWhenUp = true }: { pct: number | null; suffix?: string; goodWhenUp?: boolean }) {
+  if (pct === null) return <span className="text-gray-400">no earlier data</span>;
+  const up = pct > 0;
+  const flat = pct === 0;
+  const good = flat ? null : up === goodWhenUp;
+  const color = flat ? "text-gray-400" : good ? "text-green-600" : "text-red-500";
+  const arrow = flat ? "→" : up ? "↑" : "↓";
+  return <span className={color}>{arrow} {Math.abs(pct)}%{suffix ? ` ${suffix}` : ""}</span>;
+}
+
+function Stat({ icon, label, value, sub, delta, tone = "slate" }: { icon: React.ReactNode; label: string; value: string; sub?: string; delta?: React.ReactNode; tone?: string }) {
   return (
     <div className="rounded-2xl border border-gray-200 bg-white shadow-card p-4">
       <div className="flex items-center gap-3">
@@ -143,7 +155,13 @@ function Stat({ icon, label, value, sub, tone = "slate" }: { icon: React.ReactNo
           <p className="text-xl font-semibold leading-tight">{value}</p>
         </div>
       </div>
-      {sub && <p className="mt-2 text-xs text-gray-400">{sub}</p>}
+      {(delta || sub) && (
+        <p className="mt-2 text-xs font-medium">
+          {delta}
+          {delta && sub && <span className="text-gray-400"> · </span>}
+          {sub && <span className="font-normal text-gray-400">{sub}</span>}
+        </p>
+      )}
     </div>
   );
 }
