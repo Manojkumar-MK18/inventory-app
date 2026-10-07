@@ -12,7 +12,9 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "sync-indexes": "tsx scripts/sync-indexes.ts",
-    "https": "node scripts/https-proxy.mjs"
+    "https": "node scripts/https-proxy.mjs",
+    "dev:lan": "node scripts/serve-lan.mjs dev",
+    "start:lan": "node scripts/serve-lan.mjs start"
   },
   "dependencies": {
     "@hookform/resolvers": "^3.9.1",
