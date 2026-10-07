@@ -99,13 +99,23 @@ export function PosScreen({ products, businessName, gstin, gstType, pricesInclud
   }, []);
 
   useEffect(() => {
-    const host = window.location.hostname; // what the cashier actually opened
-    const port = window.location.port ? `:${window.location.port}` : "";
-    const proto = window.location.protocol;
-    // Prefer a real LAN IP; fall back to the host the POS was opened on.
+    const loc = window.location;
+    const host = loc.hostname; // what the cashier actually opened
     const onLocalhost = host === "localhost" || host === "127.0.0.1";
+    // The phone's camera only works on https. Give it an HTTPS link so the
+    // camera opens straight away — no setup knowledge needed by the user.
     const ip = lanIps[lanPick] ?? (onLocalhost ? "" : host);
-    const base = ip ? `${proto}//${ip}${port}` : window.location.origin;
+    const httpsPort = process.env.NEXT_PUBLIC_HTTPS_PORT || "3443";
+    let base: string;
+    if (loc.protocol === "https:") {
+      // POS is already on https — reuse its host/port (camera already allowed).
+      base = ip ? `https://${ip}${loc.port ? `:${loc.port}` : ""}` : loc.origin;
+    } else if (ip) {
+      // POS on http — point the phone at the HTTPS front (port 3443 by default).
+      base = `https://${ip}:${httpsPort}`;
+    } else {
+      base = loc.origin; // last resort (localhost with no LAN IP)
+    }
     setScanUrl(`${base}/scanner?pair=${pairCode}`);
   }, [pairCode, lanIps, lanPick]);
 
@@ -443,9 +453,9 @@ export function PosScreen({ products, businessName, gstin, gstType, pricesInclud
             {/* Steps + URL + copy */}
             <div className="min-w-0 flex-1">
               <ol className="flex list-decimal flex-col gap-1.5 pl-5 text-sm text-gray-600">
-                <li>On the phone (same Wi-Fi), <b>scan the QR</b> — or open the link below.</li>
-                <li>The pair code fills in automatically. If asked, enter <span className="font-mono font-bold tracking-widest text-gray-900">{pairCode}</span>.</li>
-                <li>Tap <b>Start camera</b> and scan a barcode — items appear here instantly.</li>
+                <li>On the phone (same Wi-Fi), <b>scan this QR</b> with the camera — or open the link below.</li>
+                <li>If the phone shows a safety screen, tap <b>Advanced → Proceed</b> (one time only).</li>
+                <li>Tap <b>Start camera</b> and scan a product barcode — items appear in the bill here instantly.</li>
               </ol>
 
               <div className="mt-3">
@@ -480,7 +490,9 @@ export function PosScreen({ products, businessName, gstin, gstType, pricesInclud
               </div>
             </div>
           </div>
-          <p className="mt-3 text-xs text-gray-400">Camera needs HTTPS on the phone — see docs/WIRELESS-SCANNER.md for the one-time free setup. You can always type a barcode on the scanner page.</p>
+          <p className="mt-3 text-xs text-gray-400">
+            The camera opens by itself. If it says &ldquo;camera blocked&rdquo;, the HTTPS helper isn&rsquo;t running on this PC — start it with <span className="font-mono">npm run https</span> (one-time setup in docs/WIRELESS-SCANNER.md). You can also just type the barcode on the phone.
+          </p>
         </div>
       )}
 

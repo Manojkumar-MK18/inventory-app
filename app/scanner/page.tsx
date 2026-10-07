@@ -81,8 +81,8 @@ export default function ScannerPage() {
       const insecure = window.location.protocol !== "https:" && window.location.hostname !== "localhost";
       setCamError(
         insecure
-          ? "Camera is blocked because this page is not HTTPS. Open it over https:// (see the setup note), or type barcodes below."
-          : "Could not open the camera. Allow camera permission, or type barcodes below."
+          ? "This link is not secure (http), so the phone blocks the camera. Ask the shop to open the POS over https, or just type the barcode below — it still works."
+          : "Could not open the camera. Please allow camera permission for this page, or type the barcode below."
       );
     }
   }
