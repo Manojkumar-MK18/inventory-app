@@ -2,11 +2,12 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { Plus, Pencil, Package, Search, Check, EyeOff } from "lucide-react";
+import { Plus, Pencil, Package, Search, Check, EyeOff, Barcode } from "lucide-react";
 import { createProduct, updateProduct, adjustStock, adjustVariantStock, setSellable, markReady, type ProductDTO } from "@/actions/products";
 import { formatINR, toRupees } from "@/lib/money";
 import { UNITS, GST_RATES } from "@/lib/units";
 import { Field, InfoTip } from "@/components/InfoTip";
+import { BarcodeModal } from "@/components/products/BarcodeModal";
 
 type Mode = { kind: "closed" } | { kind: "add" } | { kind: "edit"; product: ProductDTO };
 
@@ -31,11 +32,12 @@ function isLow(p: ProductDTO) {
   return p.variants.length > 0 ? lowSizes(p).length > 0 : p.currentStock <= p.minStock;
 }
 
-export function ProductManager({ initial, categories }: { initial: ProductDTO[]; categories: string[] }) {
+export function ProductManager({ initial, categories, shopName }: { initial: ProductDTO[]; categories: string[]; shopName: string }) {
   const router = useRouter();
   const [mode, setMode] = useState<Mode>({ kind: "closed" });
   const [stockFor, setStockFor] = useState<ProductDTO | null>(null);
   const [readyFor, setReadyFor] = useState<ProductDTO | null>(null);
+  const [barcodeFor, setBarcodeFor] = useState<ProductDTO | null>(null);
   const [query, setQuery] = useState("");
   const [cat, setCat] = useState("");
 
@@ -157,6 +159,9 @@ export function ProductManager({ initial, categories }: { initial: ProductDTO[];
                       <button onClick={() => setStockFor(p)} className="flex items-center gap-1 rounded-md border px-2.5 py-1 text-xs hover:bg-gray-100">
                         <Package size={13} /> Stock
                       </button>
+                      <button onClick={() => setBarcodeFor(p)} className="flex items-center gap-1 rounded-md border px-2.5 py-1 text-xs hover:bg-gray-100" title="Generate, view, download or print barcodes">
+                        <Barcode size={13} /> Barcode
+                      </button>
                       <button onClick={() => setMode({ kind: "edit", product: p })} className="flex items-center gap-1 rounded-md border px-2.5 py-1 text-xs hover:bg-gray-100">
                         <Pencil size={13} /> Edit
                       </button>
@@ -191,6 +196,13 @@ export function ProductManager({ initial, categories }: { initial: ProductDTO[];
           onSaved={() => { setReadyFor(null); router.refresh(); }}
         />
       )}
+      {barcodeFor && (
+        <BarcodeModal
+          productId={barcodeFor.id}
+          shopName={shopName}
+          onClose={() => { setBarcodeFor(null); router.refresh(); }}
+        />
+      )}
     </div>
   );
 }
@@ -198,7 +210,7 @@ export function ProductManager({ initial, categories }: { initial: ProductDTO[];
 function Modal({ title, children, onClose }: { title: string; children: React.ReactNode; onClose: () => void }) {
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" onClick={onClose}>
-      <div className="max-h-[90vh] w-full max-w-3xl overflow-auto rounded-xl bg-white p-7 shadow-xl" onClick={(e) => e.stopPropagation()}>
+      <div className="max-h-[90vh] w-full max-w-4xl overflow-auto rounded-2xl bg-white p-7 shadow-xl" onClick={(e) => e.stopPropagation()}>
         <h2 className="mb-5 text-lg font-semibold">{title}</h2>
         {children}
       </div>
@@ -263,7 +275,7 @@ function ProductForm({ product, categories, onClose, onSaved }: { product: Produ
       variants: hasVariants
         ? rows.map((v) => ({
             label: v.label.trim(),
-            barcode: "", // all sizes share the product's barcode
+            barcode: v.barcode.trim(), // each size's own barcode (for scanning)
             openingStock: v.openingStock || 0,
             minStock: v.minStock || 0,
             priceRupees: Number(v.priceRupees), // each size has its own sale price
@@ -289,7 +301,7 @@ function ProductForm({ product, categories, onClose, onSaved }: { product: Produ
         <Field label="SKU / code" hint="A short unique code to identify this product (e.g. TS001). No two products can share the same code.">
           <input name="sku" required defaultValue={product?.sku} placeholder="TS001" className={inputCls} />
         </Field>
-        <Field label="Barcode (optional)" hint="The barcode printed on the product. Scan it at billing to add the item instantly.">
+        <Field label="Barcode (optional)" hint="For products WITHOUT sizes: the barcode on the product. Scan it (phone or USB) at billing to add the item instantly. For products with sizes, set each size's barcode in the Sizes section below.">
           <input name="barcode" defaultValue={product?.barcode ?? ""} placeholder="Scan or type" className={inputCls} />
         </Field>
         {hasVariants ? (
@@ -342,32 +354,34 @@ function ProductForm({ product, categories, onClose, onSaved }: { product: Produ
           <label className="flex items-center gap-2 text-sm font-medium text-gray-700">
             <input type="checkbox" checked={hasVariants} onChange={(e) => { setHasVariants(e.target.checked); if (e.target.checked && variants.length === 0) addVariant(); }} />
             This product has sizes / variants (S, M, L or 32, 36…)
-            <InfoTip text="Turn on for clothing/footwear. Sizes share the barcode above, but each size has its own sale price, stock and low-stock alert." />
+            <InfoTip text="Turn on for clothing/footwear. Each size gets its own barcode, sale price, stock and low-stock alert. The top Barcode field is only used for products without sizes." />
           </label>
 
           {hasVariants && (
             <div className="mt-4 flex flex-col gap-3">
               <p className="rounded-md bg-indigo-50 px-3 py-2 text-xs text-indigo-700">
-                All sizes share the <b>Barcode</b> above, but each size has its own <b>sale price</b>, stock and low-stock alert.
+                Each size has its own <b>barcode</b> (from its tag — for phone/USB scanning), <b>sale price</b>, stock and low-stock alert.
               </p>
-              <div className="flex gap-3 text-xs font-medium uppercase tracking-wide text-gray-400">
-                <span className="w-20">Size</span>
-                <span className="flex-1">{editing ? "In stock" : "Opening stock"}</span>
-                <span className="flex-1">Sale price ₹</span>
-                <span className="flex-1">Low-stock alert at</span>
-                <span className="w-6" />
+              <div className="grid grid-cols-[3rem_1fr_5rem_5.5rem_4.5rem_1.5rem] items-center gap-2 text-[11px] font-semibold uppercase tracking-wide text-gray-400">
+                <span>Size</span>
+                <span>Barcode (scan / type)</span>
+                <span>{editing ? "In stock" : "Opening"}</span>
+                <span>Sale price ₹</span>
+                <span>Alert at</span>
+                <span />
               </div>
               {variants.map((v, i) => (
-                <div key={i} className="flex items-center gap-3">
-                  <input value={v.label} onChange={(e) => patchVariant(i, { label: e.target.value })} placeholder="M" className={`${inputCls} w-20`} />
+                <div key={i} className="grid grid-cols-[3rem_1fr_5rem_5.5rem_4.5rem_1.5rem] items-center gap-2">
+                  <input value={v.label} onChange={(e) => patchVariant(i, { label: e.target.value })} placeholder="M" className={`${inputCls} w-full`} />
+                  <input value={v.barcode} onChange={(e) => patchVariant(i, { barcode: e.target.value })} title="This size's barcode — scan the tag or type it, or generate one from the Barcodes button" placeholder="scan / type" className={`${inputCls} w-full`} />
                   {v.existingStock != null ? (
-                    <span className="flex-1 text-sm text-gray-600">{v.existingStock} <span className="text-xs text-gray-400">(use Stock button)</span></span>
+                    <span className="text-sm text-gray-600" title="Change stock from the Stock button on the product list">{v.existingStock}</span>
                   ) : (
-                    <input type="number" min={0} value={v.openingStock} onChange={(e) => patchVariant(i, { openingStock: Math.max(0, Number(e.target.value)) })} className={`${inputCls} flex-1`} />
+                    <input type="number" min={0} value={v.openingStock} onChange={(e) => patchVariant(i, { openingStock: Math.max(0, Number(e.target.value)) })} className={`${inputCls} w-full`} />
                   )}
-                  <input type="number" min={0} step="0.01" value={v.priceRupees} onChange={(e) => patchVariant(i, { priceRupees: e.target.value })} title="Sale price for this size" placeholder="e.g. 599" className={`${inputCls} flex-1`} />
-                  <input type="number" min={0} value={v.minStock} onChange={(e) => patchVariant(i, { minStock: Math.max(0, Number(e.target.value)) })} title="Low-stock alert for this size" placeholder="0" className={`${inputCls} flex-1`} />
-                  <button type="button" onClick={() => removeVariant(i)} className="flex w-6 justify-center text-red-400 hover:text-red-600" title="Remove size">✕</button>
+                  <input type="number" min={0} step="0.01" value={v.priceRupees} onChange={(e) => patchVariant(i, { priceRupees: e.target.value })} title="Sale price for this size" placeholder="599" className={`${inputCls} w-full`} />
+                  <input type="number" min={0} value={v.minStock} onChange={(e) => patchVariant(i, { minStock: Math.max(0, Number(e.target.value)) })} title="Low-stock alert for this size" placeholder="0" className={`${inputCls} w-full`} />
+                  <button type="button" onClick={() => removeVariant(i)} className="flex justify-center text-red-400 hover:text-red-600" title="Remove size">✕</button>
                 </div>
               ))}
               <button type="button" onClick={addVariant} className="mt-1 flex items-center gap-1 self-start rounded-md border border-gray-300 bg-white px-3 py-1.5 text-xs font-medium hover:bg-gray-100">

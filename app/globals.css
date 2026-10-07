@@ -102,3 +102,24 @@ button:not(:disabled):active {
     margin: 4mm;
   }
 }
+
+/* Printing barcode labels: show only the barcode area, tile the cards. */
+@media print {
+  body:has(#barcode-print-area) * {
+    visibility: hidden;
+  }
+  #barcode-print-area,
+  #barcode-print-area * {
+    visibility: visible;
+  }
+  #barcode-print-area {
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 100%;
+    box-shadow: none !important;
+  }
+  .barcode-card {
+    break-inside: avoid;
+  }
+}

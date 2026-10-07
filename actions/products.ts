@@ -8,6 +8,7 @@ import { productRepo } from "@/repositories/productRepo";
 import { connectDB } from "@/lib/db";
 import { StockMovementModel } from "@/models/StockMovement";
 import { toPaise } from "@/lib/money";
+import { makeEan13 } from "@/lib/barcode";
 import { ProductModel } from "@/models/Product";
 import { CategoryModel } from "@/models/Category";
 import { productFormSchema, productUpdateSchema, stockAdjustSchema, variantStockAdjustSchema, quickProductSchema, setSellableSchema, markReadySchema } from "@/schemas/product";
@@ -368,6 +369,65 @@ export async function markReady(raw: unknown): Promise<ActionResult> {
   revalidatePath("/products");
   revalidatePath("/pos");
   return { ok: true };
+}
+
+export interface BarcodeLabel {
+  label: string; // size label, or "" for a simple product
+  barcode: string;
+  name: string; // product name (for the printed label)
+  priceRupees: number; // sale price for this label (0 if unset)
+}
+
+/**
+ * Ensure every sellable "slot" of a product has a barcode, generating unique
+ * in-store EAN-13 codes for any that are missing, and return them for printing.
+ * For a product with sizes, one barcode per size; otherwise one for the product.
+ */
+export async function generateBarcodes(raw: unknown): Promise<{ ok: true; productName: string; labels: BarcodeLabel[] } | { ok: false; error: string }> {
+  const ctx = await getContext();
+  requireRole(ctx, ["OWNER", "MANAGER"]);
+  const id = typeof raw === "string" ? raw : (raw as any)?.id;
+  if (typeof id !== "string" || id.length !== 24) return { ok: false, error: "Invalid product" };
+
+  await connectDB();
+  const bId = new mongoose.Types.ObjectId(ctx.businessId);
+  const product = await ProductModel.findOne({ businessId: bId, _id: id });
+  if (!product) return { ok: false, error: "Product not found" };
+
+  // Collect existing barcodes across the whole business to keep new ones unique.
+  const used = new Set<string>();
+  const all = await ProductModel.find({ businessId: bId }, { barcode: 1, "variants.barcode": 1 }).lean();
+  for (const p of all as any[]) {
+    if (p.barcode) used.add(p.barcode);
+    for (const v of p.variants ?? []) if (v.barcode) used.add(v.barcode);
+  }
+  const freshCode = () => {
+    let c = makeEan13();
+    while (used.has(c)) c = makeEan13();
+    used.add(c);
+    return c;
+  };
+
+  const hasVariants = (product.variants ?? []).length > 0;
+  let changed = false;
+  const labels: BarcodeLabel[] = [];
+
+  if (hasVariants) {
+    for (const v of product.variants as any[]) {
+      if (!v.barcode) { v.barcode = freshCode(); changed = true; }
+      labels.push({ label: v.label, barcode: v.barcode, name: product.name, priceRupees: (v.price ?? product.salePrice) / 100 });
+    }
+  } else {
+    if (!product.barcode) { product.barcode = freshCode(); changed = true; }
+    labels.push({ label: "", barcode: product.barcode, name: product.name, priceRupees: product.salePrice / 100 });
+  }
+
+  if (changed) {
+    await product.save();
+    revalidatePath("/products");
+    revalidatePath("/pos");
+  }
+  return { ok: true, productName: product.name, labels };
 }
 
 /** Pull a product back to draft (stop selling). */
