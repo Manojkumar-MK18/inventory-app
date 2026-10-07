@@ -154,4 +154,25 @@ Note on data model: the design mentions *color*. Our products use **size variant
 - **Only real task** beyond coding is the **free HTTPS (mkcert)** step so the phone camera is allowed.
 - If the shop wants the most reliable counter with the least fuss, a **₹500 USB/Bluetooth scanner works right now with no code**.
 
-> Next step: if you want, I can scaffold the `/scanner` page, the `/api/scan` + SSE routes, and the in-memory hub on this branch as a working MVP.
+---
+
+## 10. Status — MVP implemented on this branch ✅
+
+A working first version is now in the codebase (no FastAPI, all Next.js):
+
+| File | Role |
+|---|---|
+| `lib/scanHub.ts` | In-memory pub/sub (`pair` → businessId + SSE clients) |
+| `app/api/scan/stream/route.ts` | SSE stream the POS subscribes to (auth'd; binds pair→businessId) |
+| `app/api/scan/route.ts` | Phone POSTs `{barcode, pair}` → product lookup → push to POS |
+| `app/scanner/page.tsx` | Mobile scanner page (camera via `BarcodeDetector` + manual entry) |
+| `components/pos/PosScreen.tsx` | "Phone scan" panel: shows pair code + URL, opens SSE, adds scans to the cart |
+| `middleware.ts` | Allows `/scanner` + `/api/scan` without login (guarded by the pair code) |
+
+**How to use:** open the POS billing screen → click **Phone scan** → it shows a pair code and a URL. On a phone on the same Wi-Fi, open that URL → tap **Start camera** → scan. Items drop into the open bill instantly. Stock still updates only when the bill is generated.
+
+**Before it can find products:** set a **barcode on each product / size** (Products → Edit). A size's own barcode scans straight to that size.
+
+**For the live camera** you still need the one-time **HTTPS (mkcert)** step from §4 — until then, the scanner page's **type-a-barcode** box works over plain http.
+
+Smoke-tested: routes build and respond (`/scanner` 200; unpaired scan → 409; missing barcode → 400). End-to-end camera flow needs a phone on the LAN + the HTTPS step.

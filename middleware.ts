@@ -5,6 +5,8 @@ import { authConfig } from "@/lib/auth.config";
 export const { auth: middleware } = NextAuth(authConfig);
 
 export const config = {
-  // Protect everything except static assets, the auth API, and Next internals.
-  matcher: ["/((?!api/auth|_next/static|_next/image|favicon.ico|.*\\..*).*)"],
+  // Protect everything except static assets, the auth API, Next internals, and the
+  // wireless-scanner surface (the phone scanner page + its API are used without login;
+  // they are guarded by a short-lived pairing code instead).
+  matcher: ["/((?!api/auth|api/scan|scanner|_next/static|_next/image|favicon.ico|.*\\..*).*)"],
 };

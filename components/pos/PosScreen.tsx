@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Maximize, Minimize, ShoppingCart } from "lucide-react";
+import { Maximize, Minimize, ShoppingCart, Smartphone, X } from "lucide-react";
 import type { ProductDTO } from "@/actions/products";
 import { createSale, type SavedSale } from "@/actions/sales";
 import { computeBill, type GstType } from "@/lib/tax";
@@ -11,6 +11,14 @@ import { Receipt } from "@/components/invoice/Receipt";
 import { normalisePhone, billMessage, whatsappUrl } from "@/lib/whatsapp";
 
 type DiscUnit = "₹" | "%";
+
+/** Short, unambiguous pairing code for the phone scanner. */
+function makePairCode(): string {
+  const chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"; // no 0/O/1/I
+  const a = new Uint8Array(6);
+  crypto.getRandomValues(a);
+  return Array.from(a, (n) => chars[n % chars.length]).join("");
+}
 
 interface CartLine {
   product: ProductDTO;
@@ -65,12 +73,60 @@ export function PosScreen({ products, businessName, gstin, gstType, pricesInclud
   const [billedBy, setBilledBy] = useState(""); // who is making the bill (kept across bills)
   const [askBiller, setAskBiller] = useState(false); // show "who is billing?" prompt
   const [billerInput, setBillerInput] = useState("");
+  // ---- Wireless phone scanner ----
+  const [pairCode] = useState(makePairCode);
+  const [showScan, setShowScan] = useState(false);
+  const [scanConnected, setScanConnected] = useState(false);
+  const [scanToast, setScanToast] = useState("");
+  const [scanUrl, setScanUrl] = useState("");
 
   useEffect(() => {
     setNow(new Date());
     const t = setInterval(() => setNow(new Date()), 1000);
     return () => clearInterval(t);
   }, []);
+
+  useEffect(() => {
+    setScanUrl(`${window.location.origin}/scanner?pair=${pairCode}`);
+  }, [pairCode]);
+
+  // Auto-hide the little scan toast.
+  useEffect(() => {
+    if (!scanToast) return;
+    const t = setTimeout(() => setScanToast(""), 3500);
+    return () => clearTimeout(t);
+  }, [scanToast]);
+
+  // Add a scanned product to the cart (built from the loaded product list).
+  const addByScanRef = useRef<(productId: string, variantLabel: string | null, name: string) => void>(() => {});
+  addByScanRef.current = (productId, variantLabel, name) => {
+    const p = products.find((pp) => pp.id === productId);
+    if (!p) return setScanToast(`Scanned "${name}" isn't loaded — refresh this page`);
+    if (p.variants.length > 0) {
+      if (!variantLabel) return setScanToast(`${name}: scan the size's own barcode`);
+      const v = p.variants.find((x) => x.label === variantLabel);
+      if (!v) return setScanToast(`${name}: size ${variantLabel} not found`);
+      addEntry({ product: p, variantLabel, price: v.price ?? p.salePrice, stock: v.stock });
+    } else {
+      addEntry({ product: p, price: p.salePrice, stock: p.currentStock });
+    }
+    setScanToast(`Scanned: ${name}${variantLabel ? ` (${variantLabel})` : ""}`);
+  };
+
+  // Listen for scans pushed from the paired phone.
+  useEffect(() => {
+    const es = new EventSource(`/api/scan/stream?pair=${pairCode}`);
+    es.onmessage = (ev) => {
+      try {
+        const msg = JSON.parse(ev.data);
+        if (msg.type === "CONNECTION_STATUS") setScanConnected(true);
+        else if (msg.type === "PRODUCT_FOUND") addByScanRef.current(msg.productId, msg.variantLabel, msg.name);
+        else if (msg.type === "PRODUCT_NOT_FOUND") setScanToast(`Not found: ${msg.barcode}`);
+      } catch { /* ignore malformed */ }
+    };
+    es.onerror = () => setScanConnected(false);
+    return () => es.close();
+  }, [pairCode]);
 
   function toggleFullscreen() {
     if (document.fullscreenElement) {
@@ -314,6 +370,11 @@ export function PosScreen({ products, businessName, gstin, gstType, pricesInclud
               <p className="text-gray-400">{now.toLocaleTimeString("en-IN", { timeZone: "Asia/Kolkata", hour: "2-digit", minute: "2-digit", second: "2-digit" })}</p>
             </div>
           )}
+          <button type="button" onClick={() => setShowScan((s) => !s)} title="Use your phone as a barcode scanner"
+            className="relative flex items-center gap-1.5 rounded-lg border border-gray-300 px-3 py-1.5 text-sm text-gray-600 hover:bg-gray-100">
+            <Smartphone size={15} /> Phone scan
+            <span className={`ml-0.5 h-2 w-2 rounded-full ${scanConnected ? "bg-emerald-500" : "bg-gray-300"}`} />
+          </button>
           <button type="button" onClick={toggleFullscreen} title="Full screen"
             className="flex items-center gap-1.5 rounded-lg border border-gray-300 px-3 py-1.5 text-sm text-gray-600 hover:bg-gray-100">
             {fullscreen ? <Minimize size={15} /> : <Maximize size={15} />}
@@ -321,6 +382,36 @@ export function PosScreen({ products, businessName, gstin, gstType, pricesInclud
           </button>
         </div>
       </div>
+
+      {/* Phone-scanner panel */}
+      {showScan && (
+        <div className="rounded-xl border border-gray-200 bg-white p-5 shadow-card">
+          <div className="flex items-start justify-between">
+            <div className="flex items-center gap-2">
+              <Smartphone size={18} className="text-brand-600" />
+              <h2 className="font-semibold">Use your phone as a scanner</h2>
+            </div>
+            <button onClick={() => setShowScan(false)} className="text-gray-400 hover:text-gray-600"><X size={18} /></button>
+          </div>
+          <ol className="mt-3 flex list-decimal flex-col gap-1.5 pl-5 text-sm text-gray-600">
+            <li>On the phone (same Wi-Fi), open this page: <span className="break-all font-medium text-gray-800">{scanUrl || "…"}</span></li>
+            <li>It fills the pair code automatically. If asked, enter <span className="font-mono font-bold tracking-widest text-gray-900">{pairCode}</span></li>
+            <li>Tap <b>Start camera</b> and scan a barcode — items appear here instantly.</li>
+          </ol>
+          <div className="mt-3 flex flex-wrap items-center gap-3">
+            <span className="rounded-lg bg-gray-100 px-3 py-2 text-sm">Pair code: <b className="font-mono tracking-widest">{pairCode}</b></span>
+            <span className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-medium ${scanConnected ? "bg-emerald-50 text-emerald-700" : "bg-gray-100 text-gray-500"}`}>
+              <span className={`h-2 w-2 rounded-full ${scanConnected ? "bg-emerald-500" : "bg-gray-400"}`} /> {scanConnected ? "Ready for scans" : "Connecting…"}
+            </span>
+            {scanUrl && <a href={scanUrl} target="_blank" rel="noreferrer" className="text-sm text-brand-600 underline">Open scanner (this device)</a>}
+          </div>
+          <p className="mt-2 text-xs text-gray-400">Camera needs HTTPS on the phone — see docs/WIRELESS-SCANNER.md for the one-time free setup. You can always type a barcode on the scanner page.</p>
+        </div>
+      )}
+
+      {scanToast && (
+        <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-2.5 text-sm font-medium text-emerald-700">{scanToast}</div>
+      )}
 
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-[1fr_360px]">
       <div>
