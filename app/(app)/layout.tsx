@@ -23,7 +23,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
 
   return (
     <div className="flex min-h-screen bg-[var(--background)]">
-      <Sidebar businessName={business?.name ?? "Shop"} role={ctx.role} />
+      <Sidebar businessName={business?.name ?? "Shop"} role={ctx.role} permissions={ctx.permissions ?? {}} />
       <div className="flex min-w-0 flex-1 flex-col">
         <AppHeader status={status} today={today} />
         <main className="w-full flex-1 overflow-x-auto p-8">{children}</main>

@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { getContext } from "@/lib/context";
-import { requireRole } from "@/lib/session";
+import { requirePerm } from "@/lib/session";
 import { connectDB } from "@/lib/db";
 import { BusinessModel } from "@/models/Business";
 import mongoose from "mongoose";
@@ -182,7 +182,7 @@ async function businessConfig(businessId: string): Promise<BusinessConfig> {
 
 export async function createSale(raw: unknown): Promise<SaleResult> {
   const ctx = await getContext();
-  requireRole(ctx, ["OWNER", "MANAGER", "CASHIER"]);
+  requirePerm(ctx, "pos");
 
   const parsed = createSaleSchema.safeParse(raw);
   if (!parsed.success) {
@@ -207,7 +207,7 @@ export async function createSale(raw: unknown): Promise<SaleResult> {
 /** Record a past/forgotten bill with a chosen date and auto or manual invoice number. */
 export async function createBackdatedSale(raw: unknown): Promise<SaleResult> {
   const ctx = await getContext();
-  requireRole(ctx, ["OWNER", "MANAGER"]);
+  requirePerm(ctx, "sales");
 
   const parsed = backdatedSaleSchema.safeParse(raw);
   if (!parsed.success) {

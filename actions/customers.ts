@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache";
 import mongoose from "mongoose";
 import { getContext } from "@/lib/context";
-import { requireRole } from "@/lib/session";
+import { requirePerm } from "@/lib/session";
 import { connectDB } from "@/lib/db";
 import { CustomerModel } from "@/models/Customer";
 import { PaymentModel } from "@/models/Payment";
@@ -39,7 +39,7 @@ export async function listCustomers(): Promise<CustomerDTO[]> {
 
 export async function createCustomer(raw: unknown): Promise<ActionResult> {
   const ctx = await getContext();
-  requireRole(ctx, ["OWNER", "MANAGER", "CASHIER"]);
+  requirePerm(ctx, "customers");
   const parsed = partyFormSchema.safeParse(raw);
   if (!parsed.success) return { ok: false, error: "Please check the details" };
 
@@ -57,7 +57,7 @@ export async function createCustomer(raw: unknown): Promise<ActionResult> {
 /** Receive a payment against a customer's khata: reduce balance + record payment. */
 export async function receiveCustomerPayment(raw: unknown): Promise<ActionResult> {
   const ctx = await getContext();
-  requireRole(ctx, ["OWNER", "MANAGER", "CASHIER"]);
+  requirePerm(ctx, "customers");
   const parsed = settleDueSchema.safeParse(raw);
   if (!parsed.success) return { ok: false, error: "Invalid amount" };
   const { id, amountRupees, method } = parsed.data;
@@ -87,7 +87,7 @@ export async function receiveCustomerPayment(raw: unknown): Promise<ActionResult
 
 export async function updateCustomer(raw: unknown): Promise<ActionResult> {
   const ctx = await getContext();
-  requireRole(ctx, ["OWNER", "MANAGER"]);
+  requirePerm(ctx, "customers");
   const parsed = partyUpdateSchema.safeParse(raw);
   if (!parsed.success) return { ok: false, error: "Please check the details" };
   const d = parsed.data;
@@ -104,7 +104,7 @@ export async function updateCustomer(raw: unknown): Promise<ActionResult> {
 
 export async function deleteCustomer(id: string): Promise<ActionResult> {
   const ctx = await getContext();
-  requireRole(ctx, ["OWNER", "MANAGER"]);
+  requirePerm(ctx, "customers");
   await connectDB();
   const bId = new mongoose.Types.ObjectId(ctx.businessId);
   const c = await CustomerModel.findOne({ businessId: bId, _id: id });

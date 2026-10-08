@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache";
 import mongoose from "mongoose";
 import { getContext } from "@/lib/context";
-import { requireRole } from "@/lib/session";
+import { requirePerm } from "@/lib/session";
 import { connectDB } from "@/lib/db";
 import { SaleModel } from "@/models/Sale";
 import { ReturnModel } from "@/models/Return";
@@ -95,7 +95,7 @@ export async function createReturn(raw: {
   billedBy?: string;
 }): Promise<{ ok: true; returnNo: string; totalRefund: number } | { ok: false; error: string }> {
   const ctx = await getContext();
-  requireRole(ctx, ["OWNER", "MANAGER", "CASHIER"]);
+  requirePerm(ctx, "returns");
   if (!raw?.saleId || !Array.isArray(raw.lines) || raw.lines.every((l) => (l.qty ?? 0) <= 0)) {
     return { ok: false, error: "Select at least one item and quantity to return" };
   }

@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache";
 import mongoose from "mongoose";
 import { getContext } from "@/lib/context";
-import { requireRole } from "@/lib/session";
+import { requirePerm } from "@/lib/session";
 import { productRepo } from "@/repositories/productRepo";
 import { connectDB } from "@/lib/db";
 import { StockMovementModel } from "@/models/StockMovement";
@@ -95,7 +95,7 @@ function discountToStored(value: number, unit: "₹" | "%"): number {
 
 export async function createProduct(raw: unknown): Promise<ActionResult> {
   const ctx = await getContext();
-  requireRole(ctx, ["OWNER", "MANAGER"]);
+  requirePerm(ctx, "products");
 
   const parsed = productFormSchema.safeParse(raw);
   if (!parsed.success) return { ok: false, error: "Please check the product details" };
@@ -148,7 +148,7 @@ export async function createProduct(raw: unknown): Promise<ActionResult> {
 
 export async function updateProduct(raw: unknown): Promise<ActionResult> {
   const ctx = await getContext();
-  requireRole(ctx, ["OWNER", "MANAGER"]);
+  requirePerm(ctx, "products");
 
   const parsed = productUpdateSchema.safeParse(raw);
   if (!parsed.success) return { ok: false, error: "Please check the product details" };
@@ -207,7 +207,7 @@ export async function updateProduct(raw: unknown): Promise<ActionResult> {
 /** Set stock to an exact count; records the difference as an ADJUSTMENT movement. */
 export async function adjustStock(raw: unknown): Promise<ActionResult> {
   const ctx = await getContext();
-  requireRole(ctx, ["OWNER", "MANAGER"]);
+  requirePerm(ctx, "products");
 
   const parsed = stockAdjustSchema.safeParse(raw);
   if (!parsed.success) return { ok: false, error: "Invalid stock value" };
@@ -246,7 +246,7 @@ export async function adjustStock(raw: unknown): Promise<ActionResult> {
 /** Set one variant's stock to an exact count; records the difference as an ADJUSTMENT. */
 export async function adjustVariantStock(raw: unknown): Promise<ActionResult> {
   const ctx = await getContext();
-  requireRole(ctx, ["OWNER", "MANAGER"]);
+  requirePerm(ctx, "products");
 
   const parsed = variantStockAdjustSchema.safeParse(raw);
   if (!parsed.success) return { ok: false, error: "Invalid stock value" };
@@ -287,7 +287,7 @@ export async function adjustVariantStock(raw: unknown): Promise<ActionResult> {
 /** Quick-add a draft product from the Purchase screen (not for sale until completed). */
 export async function quickCreateProduct(raw: unknown): Promise<{ ok: true; product: ProductDTO } | { ok: false; error: string }> {
   const ctx = await getContext();
-  requireRole(ctx, ["OWNER", "MANAGER"]);
+  requirePerm(ctx, "products");
   const parsed = quickProductSchema.safeParse(raw);
   if (!parsed.success) return { ok: false, error: "Please enter a product name and item code" };
   const d = parsed.data;
@@ -336,7 +336,7 @@ export async function quickCreateProduct(raw: unknown): Promise<{ ok: true; prod
 /** Mark a draft product ready to sell — requires a selling price (per size if it has sizes). */
 export async function markReady(raw: unknown): Promise<ActionResult> {
   const ctx = await getContext();
-  requireRole(ctx, ["OWNER", "MANAGER"]);
+  requirePerm(ctx, "products");
   const parsed = markReadySchema.safeParse(raw);
   if (!parsed.success) return { ok: false, error: "Enter a valid selling price" };
   const { id, salePriceRupees, taxRate, variantPrices } = parsed.data;
@@ -385,7 +385,7 @@ export interface BarcodeLabel {
  */
 export async function generateBarcodes(raw: unknown): Promise<{ ok: true; productName: string; labels: BarcodeLabel[] } | { ok: false; error: string }> {
   const ctx = await getContext();
-  requireRole(ctx, ["OWNER", "MANAGER"]);
+  requirePerm(ctx, "products");
   const id = typeof raw === "string" ? raw : (raw as any)?.id;
   if (typeof id !== "string" || id.length !== 24) return { ok: false, error: "Invalid product" };
 
@@ -433,7 +433,7 @@ export async function generateBarcodes(raw: unknown): Promise<{ ok: true; produc
 /** Pull a product back to draft (stop selling). */
 export async function setSellable(raw: unknown): Promise<ActionResult> {
   const ctx = await getContext();
-  requireRole(ctx, ["OWNER", "MANAGER"]);
+  requirePerm(ctx, "products");
   const parsed = setSellableSchema.safeParse(raw);
   if (!parsed.success) return { ok: false, error: "Invalid request" };
 

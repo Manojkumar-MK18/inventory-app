@@ -2,6 +2,7 @@ import { cache } from "react";
 import { redirect } from "next/navigation";
 import { auth } from "./auth";
 import type { Ctx, Role } from "./session";
+import { can, firstAllowedHref } from "./permissions";
 
 /**
  * The server-side tenant context. Reads the Auth.js session — businessId and role
@@ -22,6 +23,7 @@ export const getContext = cache(async (): Promise<Ctx> => {
     userId: session.user.id,
     businessId: session.user.businessId,
     role: session.user.role as Role,
+    permissions: (session.user.permissions ?? {}) as Ctx["permissions"],
   };
 });
 
@@ -33,5 +35,20 @@ export const tryGetContext = cache(async (): Promise<Ctx | null> => {
     userId: session.user.id,
     businessId: session.user.businessId,
     role: session.user.role as Role,
+    permissions: (session.user.permissions ?? {}) as Ctx["permissions"],
   };
 });
+
+/** Page guard: ensure the user can view this menu, else send them to their home page. */
+export async function requireView(moduleKey: string): Promise<Ctx> {
+  const ctx = await getContext();
+  if (!can(ctx, moduleKey, "view")) redirect(firstAllowedHref(ctx));
+  return ctx;
+}
+
+/** Page guard: owner-only pages (Settings). */
+export async function requireOwner(): Promise<Ctx> {
+  const ctx = await getContext();
+  if (ctx.role !== "OWNER") redirect(firstAllowedHref(ctx));
+  return ctx;
+}

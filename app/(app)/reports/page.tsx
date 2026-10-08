@@ -1,7 +1,9 @@
+import { requireView } from "@/lib/context";
 import { getReport } from "@/actions/reports";
 import { ReportView } from "@/components/reports/ReportView";
 
 export default async function ReportsPage() {
+  await requireView("reports");
   const initial = await getReport();
   return (
     <div className="flex flex-col gap-4">

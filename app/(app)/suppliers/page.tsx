@@ -1,7 +1,9 @@
+import { requireView } from "@/lib/context";
 import { listSuppliers, createSupplier, paySupplier, updateSupplier, deleteSupplier, supplierHistory } from "@/actions/suppliers";
 import { PartyManager } from "@/components/parties/PartyManager";
 
 export default async function SuppliersPage() {
+  await requireView("suppliers");
   const rows = await listSuppliers();
   return (
     <div className="flex flex-col gap-4">

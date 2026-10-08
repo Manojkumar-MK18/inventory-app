@@ -18,13 +18,17 @@ export interface StaffDTO {
   email: string;
   role: string;
   isSelf: boolean;
+  permissions: Record<string, string>;
 }
+
+const permSchema = z.record(z.string(), z.enum(["none", "view", "edit"])).optional();
 
 const addStaffSchema = z.object({
   name: z.string().min(2).max(120),
   email: z.string().email().max(254),
   password: z.string().min(8).max(100),
   role: z.enum(["MANAGER", "CASHIER"]),
+  permissions: permSchema,
 });
 
 export async function listStaff(): Promise<StaffDTO[]> {
@@ -42,6 +46,7 @@ export async function listStaff(): Promise<StaffDTO[]> {
       email: u?.email ?? "—",
       role: m.role,
       isSelf: m.userId.toString() === ctx.userId,
+      permissions: (m.permissions ?? {}) as Record<string, string>,
     };
   });
 }
@@ -52,7 +57,7 @@ export async function addStaff(raw: unknown): Promise<ActionResult> {
   requireRole(ctx, ["OWNER"]);
   const parsed = addStaffSchema.safeParse(raw);
   if (!parsed.success) return { ok: false, error: "Please check the details (password min 8 chars)" };
-  const { name, email, password, role } = parsed.data;
+  const { name, email, password, role, permissions } = parsed.data;
 
   await connectDB();
   const bId = new mongoose.Types.ObjectId(ctx.businessId);
@@ -65,7 +70,27 @@ export async function addStaff(raw: unknown): Promise<ActionResult> {
   const already = await BusinessMemberModel.findOne({ businessId: bId, userId: user._id });
   if (already) return { ok: false, error: "This person is already a member of this shop" };
 
-  await BusinessMemberModel.create({ businessId: bId, userId: user._id, role });
+  await BusinessMemberModel.create({ businessId: bId, userId: user._id, role, permissions: permissions ?? {} });
+  revalidatePath("/settings");
+  return { ok: true };
+}
+
+/** Change what menus a staff member can see / edit. */
+export async function setStaffPermissions(raw: { memberId: string; permissions: Record<string, string> }): Promise<ActionResult> {
+  const ctx = await getContext();
+  requireRole(ctx, ["OWNER"]);
+  const parsed = z.object({ memberId: z.string().length(24), permissions: z.record(z.string(), z.enum(["none", "view", "edit"])) }).safeParse(raw);
+  if (!parsed.success) return { ok: false, error: "Invalid permissions" };
+
+  await connectDB();
+  const bId = new mongoose.Types.ObjectId(ctx.businessId);
+  const member = await BusinessMemberModel.findOne({ businessId: bId, _id: parsed.data.memberId });
+  if (!member) return { ok: false, error: "Member not found" };
+  if (member.role === "OWNER") return { ok: false, error: "Owner always has full access" };
+
+  member.permissions = parsed.data.permissions;
+  member.markModified("permissions");
+  await member.save();
   revalidatePath("/settings");
   return { ok: true };
 }

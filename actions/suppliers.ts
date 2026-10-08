@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache";
 import mongoose from "mongoose";
 import { getContext } from "@/lib/context";
-import { requireRole } from "@/lib/session";
+import { requirePerm } from "@/lib/session";
 import { connectDB } from "@/lib/db";
 import { SupplierModel } from "@/models/Supplier";
 import { PaymentModel } from "@/models/Payment";
@@ -39,7 +39,7 @@ export async function listSuppliers(): Promise<SupplierDTO[]> {
 
 export async function createSupplier(raw: unknown): Promise<ActionResult> {
   const ctx = await getContext();
-  requireRole(ctx, ["OWNER", "MANAGER"]);
+  requirePerm(ctx, "suppliers");
   const parsed = partyFormSchema.safeParse(raw);
   if (!parsed.success) return { ok: false, error: "Please check the details" };
 
@@ -57,7 +57,7 @@ export async function createSupplier(raw: unknown): Promise<ActionResult> {
 /** Pay a supplier against what you owe: reduce balance + record payment. */
 export async function paySupplier(raw: unknown): Promise<ActionResult> {
   const ctx = await getContext();
-  requireRole(ctx, ["OWNER", "MANAGER"]);
+  requirePerm(ctx, "suppliers");
   const parsed = settleDueSchema.safeParse(raw);
   if (!parsed.success) return { ok: false, error: "Invalid amount" };
   const { id, amountRupees, method } = parsed.data;
@@ -87,7 +87,7 @@ export async function paySupplier(raw: unknown): Promise<ActionResult> {
 
 export async function updateSupplier(raw: unknown): Promise<ActionResult> {
   const ctx = await getContext();
-  requireRole(ctx, ["OWNER", "MANAGER"]);
+  requirePerm(ctx, "suppliers");
   const parsed = partyUpdateSchema.safeParse(raw);
   if (!parsed.success) return { ok: false, error: "Please check the details" };
   const d = parsed.data;
@@ -104,7 +104,7 @@ export async function updateSupplier(raw: unknown): Promise<ActionResult> {
 
 export async function deleteSupplier(id: string): Promise<ActionResult> {
   const ctx = await getContext();
-  requireRole(ctx, ["OWNER", "MANAGER"]);
+  requirePerm(ctx, "suppliers");
   await connectDB();
   const bId = new mongoose.Types.ObjectId(ctx.businessId);
   const s = await SupplierModel.findOne({ businessId: bId, _id: id });

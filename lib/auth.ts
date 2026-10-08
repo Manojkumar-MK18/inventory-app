@@ -15,9 +15,10 @@ async function activeMembership(userId: string) {
   const m = await BusinessMemberModel.findOne({ userId }).lean<{
     businessId: { toString(): string };
     role: string;
+    permissions?: Record<string, string>;
   }>();
-  if (!m) return { businessId: null, role: null };
-  return { businessId: m.businessId.toString(), role: m.role };
+  if (!m) return { businessId: null, role: null, permissions: null };
+  return { businessId: m.businessId.toString(), role: m.role, permissions: m.permissions ?? {} };
 }
 
 export const { handlers, auth, signIn, signOut } = NextAuth({
@@ -51,9 +52,10 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
       // Attach tenant claims on sign-in, on explicit update, or while still missing
       // (the latter picks up a business created during onboarding on the next request).
       if (uid && (user?.id || trigger === "update" || !token.businessId)) {
-        const { businessId, role } = await activeMembership(uid);
+        const { businessId, role, permissions } = await activeMembership(uid);
         token.businessId = businessId;
         token.role = role;
+        token.permissions = permissions;
       }
       return token;
     },
@@ -61,6 +63,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
       session.user.id = token.userId as string;
       session.user.businessId = (token.businessId as string | null) ?? null;
       session.user.role = (token.role as string | null) ?? null;
+      session.user.permissions = (token.permissions as Record<string, string> | null) ?? null;
       return session;
     },
   },

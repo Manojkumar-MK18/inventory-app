@@ -1,3 +1,4 @@
+import { requireView } from "@/lib/context";
 import Link from "next/link";
 import { IndianRupee, ShoppingCart, Plus, TrendingUp, Trophy, PackageX, RotateCcw } from "lucide-react";
 import { getDashboardStats } from "@/actions/dashboard";
@@ -5,6 +6,7 @@ import { formatINR } from "@/lib/money";
 import { TrendChart, PaymentDonut, CategoryBar, HoursBar } from "@/components/dashboard/Charts";
 
 export default async function DashboardPage() {
+  await requireView("dashboard");
   const s = await getDashboardStats();
 
   return (

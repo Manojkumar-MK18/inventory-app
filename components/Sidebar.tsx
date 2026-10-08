@@ -7,44 +7,50 @@ import {
   ReceiptText, Users, BarChart3, Settings, Wallet, Factory, CalendarCheck, RotateCcw,
 } from "lucide-react";
 import { Copyright } from "./Brand";
+import { can } from "@/lib/permissions";
 
 const SECTIONS = [
   {
     title: null,
     items: [
-      { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
-      { href: "/pos", label: "New Bill", icon: ShoppingCart },
-      { href: "/sales", label: "Sales", icon: ReceiptText },
-      { href: "/returns", label: "Returns", icon: RotateCcw },
+      { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard, module: "dashboard" },
+      { href: "/pos", label: "New Bill", icon: ShoppingCart, module: "pos" },
+      { href: "/sales", label: "Sales", icon: ReceiptText, module: "sales" },
+      { href: "/returns", label: "Returns", icon: RotateCcw, module: "returns" },
     ],
   },
   {
     title: "Inventory",
     items: [
-      { href: "/products", label: "Products", icon: Package },
-      { href: "/purchases", label: "Purchases", icon: Truck },
+      { href: "/products", label: "Products", icon: Package, module: "products" },
+      { href: "/purchases", label: "Purchases", icon: Truck, module: "purchases" },
     ],
   },
   {
     title: "People",
     items: [
-      { href: "/customers", label: "Customers", icon: Users },
-      { href: "/suppliers", label: "Suppliers", icon: Factory },
+      { href: "/customers", label: "Customers", icon: Users, module: "customers" },
+      { href: "/suppliers", label: "Suppliers", icon: Factory, module: "suppliers" },
     ],
   },
   {
     title: "Business",
     items: [
-      { href: "/expenses", label: "Expenses", icon: Wallet },
-      { href: "/attendance", label: "Attendance", icon: CalendarCheck },
-      { href: "/reports", label: "Reports", icon: BarChart3 },
-      { href: "/settings", label: "Settings", icon: Settings },
+      { href: "/expenses", label: "Expenses", icon: Wallet, module: "expenses" },
+      { href: "/attendance", label: "Attendance", icon: CalendarCheck, module: "attendance" },
+      { href: "/reports", label: "Reports", icon: BarChart3, module: "reports" },
+      { href: "/settings", label: "Settings", icon: Settings, module: "__owner__" }, // owner-only
     ],
   },
 ] as const;
 
-export function Sidebar({ businessName, role }: { businessName: string; role: string }) {
+export function Sidebar({ businessName, role, permissions }: { businessName: string; role: string; permissions: Record<string, string> }) {
   const pathname = usePathname();
+  const ctx = { role, permissions };
+  const allowed = (module: string) => (module === "__owner__" ? role === "OWNER" : can(ctx, module, "view"));
+  const sections = SECTIONS
+    .map((s) => ({ ...s, items: s.items.filter((it) => allowed(it.module)) }))
+    .filter((s) => s.items.length > 0);
 
   return (
     <aside className="sticky top-0 flex h-screen w-64 shrink-0 flex-col border-r border-gray-200 bg-white">
@@ -59,7 +65,7 @@ export function Sidebar({ businessName, role }: { businessName: string; role: st
       </div>
 
       <nav className="flex flex-1 flex-col gap-5 overflow-y-auto p-4">
-        {SECTIONS.map((section, si) => (
+        {sections.map((section, si) => (
           <div key={si} className="flex flex-col gap-1">
             {section.title && (
               <p className="px-3 pb-1 text-[10px] font-bold uppercase tracking-widest text-gray-400">{section.title}</p>

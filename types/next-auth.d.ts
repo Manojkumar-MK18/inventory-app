@@ -6,6 +6,7 @@ declare module "next-auth" {
       id: string;
       businessId: string | null;
       role: string | null;
+      permissions?: Record<string, string> | null;
     } & DefaultSession["user"];
   }
 }
@@ -15,5 +16,6 @@ declare module "next-auth/jwt" {
     userId?: string;
     businessId?: string | null;
     role?: string | null;
+    permissions?: Record<string, string> | null;
   }
 }

@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache";
 import mongoose from "mongoose";
 import { getContext } from "@/lib/context";
-import { requireRole } from "@/lib/session";
+import { requirePerm } from "@/lib/session";
 import { purchaseRepo } from "@/repositories/purchaseRepo";
 import { connectDB } from "@/lib/db";
 import { PurchaseModel } from "@/models/Purchase";
@@ -49,7 +49,7 @@ export async function listPurchases(limit = 100): Promise<PurchaseListRow[]> {
 
 export async function createPurchase(raw: unknown): Promise<ActionResult> {
   const ctx = await getContext();
-  requireRole(ctx, ["OWNER", "MANAGER"]);
+  requirePerm(ctx, "purchases");
 
   const parsed = createPurchaseSchema.safeParse(raw);
   if (!parsed.success) {
@@ -109,7 +109,7 @@ const keyOf = (pid: string, vl?: string) => `${pid}::${vl ?? ""}`;
  *  Adjusts stock by the net difference, updates cost, and fixes supplier dues. */
 export async function editPurchase(raw: unknown): Promise<ActionResult> {
   const ctx = await getContext();
-  requireRole(ctx, ["OWNER", "MANAGER"]);
+  requirePerm(ctx, "purchases");
   const parsed = editPurchaseSchema.safeParse(raw);
   if (!parsed.success) return { ok: false, error: parsed.error.issues[0]?.message ?? "Invalid details" };
   const d = parsed.data;
@@ -208,7 +208,7 @@ export async function editPurchase(raw: unknown): Promise<ActionResult> {
  *  on credit) reduce the supplier's dues. Blocked if the stock was already sold. */
 export async function deletePurchase(id: string): Promise<ActionResult> {
   const ctx = await getContext();
-  requireRole(ctx, ["OWNER", "MANAGER"]);
+  requirePerm(ctx, "purchases");
   await connectDB();
   const bId = new mongoose.Types.ObjectId(ctx.businessId);
   const p: any = await PurchaseModel.findOne({ businessId: bId, _id: id });

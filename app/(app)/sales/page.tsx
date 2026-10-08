@@ -1,3 +1,4 @@
+import { requireView } from "@/lib/context";
 import Link from "next/link";
 import { ShoppingCart } from "lucide-react";
 import { listSales } from "@/actions/sales";
@@ -9,6 +10,7 @@ import { SalesTable } from "@/components/sales/SalesTable";
 import { BackdatedBill } from "@/components/sales/BackdatedBill";
 
 export default async function SalesPage() {
+  await requireView("sales");
   const ctx = await getContext();
   const [sales, products] = await Promise.all([listSales(), listProducts({ sellableOnly: true })]);
   await connectDB();

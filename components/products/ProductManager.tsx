@@ -32,7 +32,7 @@ function isLow(p: ProductDTO) {
   return p.variants.length > 0 ? lowSizes(p).length > 0 : p.currentStock <= p.minStock;
 }
 
-export function ProductManager({ initial, categories, shopName }: { initial: ProductDTO[]; categories: string[]; shopName: string }) {
+export function ProductManager({ initial, categories, shopName, canEdit = true }: { initial: ProductDTO[]; categories: string[]; shopName: string; canEdit?: boolean }) {
   const router = useRouter();
   const [mode, setMode] = useState<Mode>({ kind: "closed" });
   const [stockFor, setStockFor] = useState<ProductDTO | null>(null);
@@ -66,12 +66,14 @@ export function ProductManager({ initial, categories, shopName }: { initial: Pro
             {categories.map((c) => <option key={c} value={c}>{c}</option>)}
           </select>
         )}
-        <button
-          onClick={() => setMode({ kind: "add" })}
-          className="flex items-center gap-1.5 rounded-xl bg-gray-900 px-4 py-2 text-sm font-medium text-white"
-        >
-          <Plus size={16} /> Add product
-        </button>
+        {canEdit && (
+          <button
+            onClick={() => setMode({ kind: "add" })}
+            className="flex items-center gap-1.5 rounded-xl bg-gray-900 px-4 py-2 text-sm font-medium text-white"
+          >
+            <Plus size={16} /> Add product
+          </button>
+        )}
       </div>
 
       <div className="overflow-hidden rounded-2xl border border-gray-200">
@@ -145,7 +147,7 @@ export function ProductManager({ initial, categories, shopName }: { initial: Pro
                   </td>
                   <td className="px-4 py-3 align-top">
                     <div className="flex justify-end gap-2">
-                      {p.sellable ? (
+                      {canEdit && (p.sellable ? (
                         <button onClick={async () => { await setSellable({ id: p.id, sellable: false }); router.refresh(); }}
                           className="flex items-center gap-1 rounded-md border px-2.5 py-1 text-xs text-gray-500 hover:bg-gray-100" title="Stop selling (make draft)">
                           <EyeOff size={13} /> Draft
@@ -155,16 +157,22 @@ export function ProductManager({ initial, categories, shopName }: { initial: Pro
                           className="flex items-center gap-1 rounded-md bg-green-600 px-2.5 py-1 text-xs font-medium text-white hover:bg-green-700" title="Set selling price and make ready to sell">
                           <Check size={13} /> Ready to sell
                         </button>
+                      ))}
+                      {canEdit && (
+                        <button onClick={() => setStockFor(p)} className="flex items-center gap-1 rounded-md border px-2.5 py-1 text-xs hover:bg-gray-100">
+                          <Package size={13} /> Stock
+                        </button>
                       )}
-                      <button onClick={() => setStockFor(p)} className="flex items-center gap-1 rounded-md border px-2.5 py-1 text-xs hover:bg-gray-100">
-                        <Package size={13} /> Stock
-                      </button>
-                      <button onClick={() => setBarcodeFor(p)} className="flex items-center gap-1 rounded-md border px-2.5 py-1 text-xs hover:bg-gray-100" title="Generate, view, download or print barcodes">
+                      <button onClick={() => setBarcodeFor(p)} className="flex items-center gap-1 rounded-md border px-2.5 py-1 text-xs hover:bg-gray-100" title="View, download or print barcodes">
                         <Barcode size={13} /> Barcode
                       </button>
-                      <button onClick={() => setMode({ kind: "edit", product: p })} className="flex items-center gap-1 rounded-md border px-2.5 py-1 text-xs hover:bg-gray-100">
-                        <Pencil size={13} /> Edit
-                      </button>
+                      {canEdit ? (
+                        <button onClick={() => setMode({ kind: "edit", product: p })} className="flex items-center gap-1 rounded-md border px-2.5 py-1 text-xs hover:bg-gray-100">
+                          <Pencil size={13} /> Edit
+                        </button>
+                      ) : (
+                        <span className="rounded-md bg-gray-100 px-2.5 py-1 text-xs text-gray-400">View only</span>
+                      )}
                     </div>
                   </td>
                 </tr>

@@ -1,7 +1,9 @@
+import { requireView } from "@/lib/context";
 import { listReturns } from "@/actions/returns";
 import { ReturnsManager } from "@/components/returns/ReturnsManager";
 
 export default async function ReturnsPage() {
+  await requireView("returns");
   const returns = await listReturns();
   return (
     <div className="flex flex-col gap-4">

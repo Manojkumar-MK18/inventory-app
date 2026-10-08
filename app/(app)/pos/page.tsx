@@ -1,10 +1,11 @@
-import { getContext } from "@/lib/context";
+import { getContext, requireView } from "@/lib/context";
 import { connectDB } from "@/lib/db";
 import { BusinessModel } from "@/models/Business";
 import { listProducts } from "@/actions/products";
 import { PosScreen } from "@/components/pos/PosScreen";
 
 export default async function PosPage() {
+  await requireView("pos");
   const ctx = await getContext();
   const products = await listProducts({ sellableOnly: true });
 

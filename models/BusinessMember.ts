@@ -14,6 +14,9 @@ const businessMemberSchema = new Schema(
       enum: ["OWNER", "MANAGER", "CASHIER"],
       required: true,
     },
+    // Per-menu access for MANAGER/CASHIER: { dashboard: "view", pos: "edit", … }.
+    // Ignored for OWNER (always full access).
+    permissions: { type: Schema.Types.Mixed, default: {} },
   },
   { timestamps: true }
 );

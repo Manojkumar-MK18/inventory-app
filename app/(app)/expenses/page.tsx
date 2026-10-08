@@ -1,7 +1,9 @@
+import { requireView } from "@/lib/context";
 import { listExpenses } from "@/actions/expenses";
 import { ExpenseManager } from "@/components/expenses/ExpenseManager";
 
 export default async function ExpensesPage() {
+  await requireView("expenses");
   const expenses = await listExpenses();
   return (
     <div className="flex flex-col gap-4">

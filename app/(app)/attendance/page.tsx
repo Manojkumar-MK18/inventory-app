@@ -1,8 +1,10 @@
+import { requireView } from "@/lib/context";
 import { listAttendance } from "@/actions/attendance";
 import { getBusiness } from "@/actions/settings";
 import { AttendanceView } from "@/components/attendance/AttendanceView";
 
 export default async function AttendancePage() {
+  await requireView("attendance");
   const istNow = new Date(new Date().toLocaleString("en-US", { timeZone: "Asia/Kolkata" }));
   const year = istNow.getFullYear();
   const month = istNow.getMonth() + 1;

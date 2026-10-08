@@ -1,10 +1,11 @@
 import { getBusiness } from "@/actions/settings";
 import { listStaff } from "@/actions/staff";
-import { getContext } from "@/lib/context";
+import { getContext, requireOwner } from "@/lib/context";
 import { SettingsForm } from "@/components/settings/SettingsForm";
 import { StaffManager } from "@/components/settings/StaffManager";
 
 export default async function SettingsPage() {
+  await requireOwner();
   const ctx = await getContext();
   const [business, staff] = await Promise.all([getBusiness(), listStaff()]);
   const isOwner = ctx.role === "OWNER";

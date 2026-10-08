@@ -4,7 +4,7 @@ import { revalidatePath } from "next/cache";
 import mongoose from "mongoose";
 import { z } from "zod";
 import { getContext } from "@/lib/context";
-import { requireRole } from "@/lib/session";
+import { requirePerm } from "@/lib/session";
 import { connectDB } from "@/lib/db";
 import { ExpenseModel } from "@/models/Expense";
 import { toPaise } from "@/lib/money";
@@ -43,7 +43,7 @@ export async function listExpenses(limit = 200): Promise<ExpenseDTO[]> {
 
 export async function createExpense(raw: unknown): Promise<ActionResult> {
   const ctx = await getContext();
-  requireRole(ctx, ["OWNER", "MANAGER"]);
+  requirePerm(ctx, "expenses");
   const parsed = expenseFormSchema.safeParse(raw);
   if (!parsed.success) return { ok: false, error: "Please check the expense details" };
 
