@@ -29,7 +29,9 @@ export function SalesTable({ rows, businessName, gstin }: { rows: SaleListRow[];
       const t = new Date(s.date).getTime();
       if (t < fromT || t > toT) return false;
       if (!query) return true;
-      return s.invoiceNo.toLowerCase().includes(query) || (s.customerName ?? "").toLowerCase().includes(query);
+      return s.invoiceNo.toLowerCase().includes(query)
+        || (s.customerName ?? "").toLowerCase().includes(query)
+        || s.itemText.includes(query); // product name OR code
     });
   }, [rows, q, from, to]);
 
@@ -62,7 +64,7 @@ export function SalesTable({ rows, businessName, gstin }: { rows: SaleListRow[];
       <div className="flex flex-wrap items-end gap-3 rounded-xl border border-gray-200 bg-white p-4">
         <div className="relative flex-1 min-w-[200px]">
           <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
-          <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search invoice or customer…"
+          <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search invoice, customer, product or code…"
             className="w-full rounded-lg border border-gray-300 py-2 pl-9 pr-3 text-sm" />
         </div>
         <label className="flex flex-col gap-1 text-xs text-gray-500">From

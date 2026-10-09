@@ -106,6 +106,7 @@ export interface SaleListRow {
   dueNow: number; // paise still pending on this bill RIGHT NOW (after later payments)
   billedBy: string | null;
   status: string;
+  itemText: string; // item names + codes, lower-cased, for search
 }
 
 /** Recent bills for the Sales page. */
@@ -114,6 +115,15 @@ export async function listSales(limit = 100): Promise<SaleListRow[]> {
   await connectDB();
   const bId = new mongoose.Types.ObjectId(ctx.businessId);
   const rows = await SaleModel.find({ businessId: bId }).sort({ date: -1 }).limit(limit).lean();
+
+  // SKU codes: use the snapshot; backfill from products for old bills (by productId),
+  // so searching by code finds the bill even if it was made before codes were saved.
+  const skuById = new Map<string, string>();
+  const missing = [...new Set(rows.flatMap((s: any) => (s.items ?? []).filter((i: any) => !i.sku && i.productId).map((i: any) => i.productId.toString())))];
+  if (missing.length) {
+    const prods = await ProductModel.find({ businessId: bId, _id: { $in: missing } }, { sku: 1 }).lean();
+    for (const p of prods as any[]) skuById.set(p._id.toString(), p.sku ?? "");
+  }
 
   // A bill's "due at billing" is frozen, but the customer may have paid some back
   // later. Payments aren't tied to one bill, so we settle a customer's OLDEST unpaid
@@ -147,6 +157,10 @@ export async function listSales(limit = 100): Promise<SaleListRow[]> {
     const grandTotal = s.totals?.grandTotal ?? 0;
     const cashReceived = s.cashReceived ?? 0;
     const dueAtBilling = s.dueAmount ?? 0;
+    const itemText = (s.items ?? [])
+      .map((i: any) => `${i.name ?? ""} ${i.sku || (i.productId ? skuById.get(i.productId.toString()) ?? "" : "")}`)
+      .join(" ")
+      .toLowerCase();
     return {
       id: s._id.toString(),
       invoiceNo: s.invoiceNo,
@@ -162,6 +176,7 @@ export async function listSales(limit = 100): Promise<SaleListRow[]> {
       dueNow: dueNowBySale.has(s._id.toString()) ? dueNowBySale.get(s._id.toString())! : dueAtBilling,
       billedBy: s.billedBy || null,
       status: s.status,
+      itemText,
     };
   });
 }

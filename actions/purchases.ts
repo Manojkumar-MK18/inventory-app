@@ -22,6 +22,7 @@ export interface PurchaseListRow {
   supplierInvoiceNo: string;
   itemCount: number;
   totalCost: number;
+  itemText: string; // product names + codes, lower-cased, for search
 }
 
 export interface PurchaseDetail {
@@ -36,7 +37,18 @@ export interface PurchaseDetail {
 
 export async function listPurchases(limit = 100): Promise<PurchaseListRow[]> {
   const ctx = await getContext();
+  const bId = new mongoose.Types.ObjectId(ctx.businessId);
   const rows = await purchaseRepo(ctx).list(limit);
+
+  // Look up product codes (purchases store names, not codes) for search.
+  await connectDB();
+  const ids = [...new Set(rows.flatMap((p: any) => (p.items ?? []).filter((i: any) => i.productId).map((i: any) => i.productId.toString())))];
+  const skuById = new Map<string, string>();
+  if (ids.length) {
+    const prods = await ProductModel.find({ businessId: bId, _id: { $in: ids } }, { sku: 1 }).lean();
+    for (const pr of prods as any[]) skuById.set(pr._id.toString(), pr.sku ?? "");
+  }
+
   return rows.map((p: any) => ({
     id: p._id.toString(),
     date: new Date(p.date).toISOString(),
@@ -44,6 +56,10 @@ export async function listPurchases(limit = 100): Promise<PurchaseListRow[]> {
     supplierInvoiceNo: p.supplierInvoiceNo || "",
     itemCount: p.items?.length ?? 0,
     totalCost: p.totalCost ?? 0,
+    itemText: (p.items ?? [])
+      .map((i: any) => `${i.name ?? ""} ${i.productId ? skuById.get(i.productId.toString()) ?? "" : ""}`)
+      .join(" ")
+      .toLowerCase(),
   }));
 }
 

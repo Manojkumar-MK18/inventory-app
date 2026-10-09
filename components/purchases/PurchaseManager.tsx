@@ -43,7 +43,9 @@ export function PurchaseManager({ products, purchases, supplierNames, categories
       const t = new Date(p.date).getTime();
       if (t < fromT || t > toT) return false;
       if (!query) return true;
-      return p.supplierName.toLowerCase().includes(query) || p.supplierInvoiceNo.toLowerCase().includes(query);
+      return p.supplierName.toLowerCase().includes(query)
+        || p.supplierInvoiceNo.toLowerCase().includes(query)
+        || p.itemText.includes(query); // product name OR code
     });
   }, [purchases, q, from, to]);
 
@@ -71,7 +73,7 @@ export function PurchaseManager({ products, purchases, supplierNames, categories
         </button>
         <div className="relative flex-1 min-w-[200px]">
           <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
-          <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search supplier or invoice…"
+          <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search supplier, invoice, product or code…"
             className="w-full rounded-lg border border-gray-300 py-2 pl-9 pr-3 text-sm" />
         </div>
         <label className="flex flex-col gap-1 text-xs text-gray-500">From
