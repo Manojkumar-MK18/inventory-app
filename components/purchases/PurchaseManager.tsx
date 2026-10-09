@@ -438,19 +438,79 @@ function QuickProductModal({ categories, onClose, onCreated }: { categories: str
 }
 
 function PurchaseDeleteButton({ id, onDone }: { id: string; onDone: () => void }) {
+  const [open, setOpen] = useState(false);
+  return (
+    <>
+      <button onClick={() => setOpen(true)} title="Delete" className="flex items-center gap-1 rounded-md border px-2 py-1 text-xs text-red-600 hover:bg-red-50">
+        <Trash2 size={13} /> Delete
+      </button>
+      {open && <PurchaseDeleteModal id={id} onClose={() => setOpen(false)} onDone={() => { setOpen(false); onDone(); }} />}
+    </>
+  );
+}
+
+/** Deleting modal — loads the purchase and shows exactly which products/sizes/codes & stock it will reverse. */
+function PurchaseDeleteModal({ id, onClose, onDone }: { id: string; onClose: () => void; onDone: () => void }) {
+  const [data, setData] = useState<PurchaseDetail | null>(null);
+  const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
-  async function del() {
-    if (!confirm("Delete this purchase? It will remove the stock it added (and reduce supplier dues if it was on credit).")) return;
-    setBusy(true);
+  const [error, setError] = useState("");
+
+  useEffect(() => {
+    getPurchase(id).then((d) => { setData(d); setLoading(false); }).catch(() => setLoading(false));
+  }, [id]);
+
+  async function confirmDelete() {
+    setBusy(true); setError("");
     const res = await deletePurchase(id);
     setBusy(false);
-    if (!res.ok) return alert(res.error);
+    if (!res.ok) return setError(res.error);
     onDone();
   }
+
   return (
-    <button onClick={del} disabled={busy} title="Delete" className="flex items-center gap-1 rounded-md border px-2 py-1 text-xs text-red-600 hover:bg-red-50 disabled:opacity-50">
-      <Trash2 size={13} /> Delete
-    </button>
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" onClick={onClose}>
+      <div className="max-h-[90vh] w-full max-w-lg overflow-auto rounded-2xl bg-white p-6 shadow-xl" onClick={(e) => e.stopPropagation()}>
+        <h2 className="mb-1 text-lg font-semibold">Delete this purchase?</h2>
+        <p className="mb-4 text-sm text-gray-500">This removes the stock this purchase added{data?.paymentMethod === "CREDIT" ? " and reduces the supplier's dues" : ""}. The products themselves are not deleted.</p>
+
+        {loading && <p className="py-6 text-center text-gray-400">Loading…</p>}
+        {data && (
+          <>
+            <div className="mb-3 flex items-center justify-between text-sm">
+              <span className="font-medium">{data.supplierName || "No supplier"}{data.supplierInvoiceNo ? ` · Inv ${data.supplierInvoiceNo}` : ""}</span>
+              <span className="font-semibold">{formatINR(data.totalCost)}</span>
+            </div>
+            <div className="overflow-hidden rounded-xl border border-gray-200">
+              <table className="w-full text-sm">
+                <thead className="border-b border-gray-200 bg-gray-50 text-left text-[11px] font-semibold uppercase tracking-wider text-gray-500">
+                  <tr><th className="px-3 py-2">Item</th><th className="px-3 py-2">Code</th><th className="px-3 py-2 text-right">Qty (stock −)</th></tr>
+                </thead>
+                <tbody className="divide-y divide-gray-100">
+                  {data.items.map((i, idx) => (
+                    <tr key={idx}>
+                      <td className="px-3 py-2 font-medium">{i.name}</td>
+                      <td className="px-3 py-2 text-gray-400">{i.sku || "—"}</td>
+                      <td className="px-3 py-2 text-right font-medium text-red-600 tabular-nums">− {i.qty}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+            <p className="mt-3 rounded-lg bg-amber-50 px-3 py-2 text-xs text-amber-700">
+              The quantities above will be removed from each product&apos;s stock. If any were already sold, deleting may be blocked.
+            </p>
+          </>
+        )}
+        {error && <p className="mt-3 text-sm text-red-600">{error}</p>}
+        <div className="mt-4 flex justify-end gap-2">
+          <button onClick={onClose} className="rounded-lg border px-4 py-2 text-sm">Cancel</button>
+          <button onClick={confirmDelete} disabled={busy || loading} className="flex items-center gap-1.5 rounded-xl bg-red-600 px-4 py-2 text-sm font-semibold text-white disabled:opacity-50">
+            <Trash2 size={15} /> {busy ? "Deleting…" : "Delete purchase"}
+          </button>
+        </div>
+      </div>
+    </div>
   );
 }
 

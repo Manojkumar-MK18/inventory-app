@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Plus, Pencil, Package, Search, Check, EyeOff, Barcode, Trash2 } from "lucide-react";
-import { createProduct, updateProduct, adjustStock, adjustVariantStock, setSellable, markReady, type ProductDTO } from "@/actions/products";
+import { createProduct, updateProduct, adjustStock, adjustVariantStock, setSellable, markReady, deleteProduct, type ProductDTO } from "@/actions/products";
 import { formatINR, toRupees } from "@/lib/money";
 import { UNITS, GST_RATES } from "@/lib/units";
 import { Field, InfoTip } from "@/components/InfoTip";
@@ -38,6 +38,7 @@ export function ProductManager({ initial, categories, shopName, canEdit = true }
   const [stockFor, setStockFor] = useState<ProductDTO | null>(null);
   const [readyFor, setReadyFor] = useState<ProductDTO | null>(null);
   const [barcodeFor, setBarcodeFor] = useState<ProductDTO | null>(null);
+  const [deleteFor, setDeleteFor] = useState<ProductDTO | null>(null);
   const [query, setQuery] = useState("");
   const [cat, setCat] = useState("");
 
@@ -172,9 +173,14 @@ export function ProductManager({ initial, categories, shopName, canEdit = true }
                         <Barcode size={13} /> Barcode
                       </button>
                       {canEdit ? (
-                        <button onClick={() => setMode({ kind: "edit", product: p })} className="flex items-center gap-1 rounded-md border px-2.5 py-1 text-xs hover:bg-gray-100">
-                          <Pencil size={13} /> Edit
-                        </button>
+                        <>
+                          <button onClick={() => setMode({ kind: "edit", product: p })} className="flex items-center gap-1 rounded-md border px-2.5 py-1 text-xs hover:bg-gray-100">
+                            <Pencil size={13} /> Edit
+                          </button>
+                          <button onClick={() => setDeleteFor(p)} className="flex items-center gap-1 rounded-md border px-2.5 py-1 text-xs text-red-600 hover:bg-red-50" title="Delete this product">
+                            <Trash2 size={13} /> Delete
+                          </button>
+                        </>
                       ) : (
                         <span className="rounded-md bg-gray-100 px-2.5 py-1 text-xs text-gray-400">View only</span>
                       )}
@@ -216,7 +222,69 @@ export function ProductManager({ initial, categories, shopName, canEdit = true }
           onClose={() => { setBarcodeFor(null); router.refresh(); }}
         />
       )}
+      {deleteFor && (
+        <DeleteProductModal
+          product={deleteFor}
+          onClose={() => setDeleteFor(null)}
+          onDone={() => { setDeleteFor(null); router.refresh(); }}
+        />
+      )}
     </div>
+  );
+}
+
+/** Confirmation that spells out exactly what's being deleted (name, code, sizes, stock). */
+function DeleteProductModal({ product, onClose, onDone }: { product: ProductDTO; onClose: () => void; onDone: () => void }) {
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
+  async function confirmDelete() {
+    setBusy(true); setError("");
+    const res = await deleteProduct(product.id);
+    setBusy(false);
+    if (!res.ok) return setError(res.error);
+    onDone();
+  }
+  const hasStock = product.currentStock > 0;
+  return (
+    <Modal title="Delete product?" onClose={onClose}>
+      <div className="flex flex-col gap-3">
+        <p className="text-sm text-gray-600">You are about to delete this product. It will be removed from Products and billing. Past bills that used it are kept.</p>
+
+        <div className="rounded-xl border border-gray-200 bg-gray-50 p-3 text-sm">
+          <div className="flex items-center justify-between">
+            <span className="font-semibold">{product.name}</span>
+            <span className="text-xs text-gray-400">Code: {product.sku}</span>
+          </div>
+          {product.barcode && <p className="mt-0.5 text-xs text-gray-500">Barcode: {product.barcode}</p>}
+          {product.variants.length > 0 ? (
+            <div className="mt-2 flex flex-col gap-1">
+              <p className="text-[11px] font-semibold uppercase tracking-wide text-gray-400">Sizes to be deleted</p>
+              {product.variants.map((v) => (
+                <div key={v.label} className="flex items-center justify-between text-xs">
+                  <span><b>{v.label}</b>{v.barcode ? <span className="ml-1 text-gray-400">· {v.barcode}</span> : ""}</span>
+                  <span className="text-gray-500">{v.stock} in stock</span>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <p className="mt-1 text-xs text-gray-500">{product.currentStock} {product.unit} in stock</p>
+          )}
+        </div>
+
+        {hasStock && (
+          <p className="rounded-lg bg-amber-50 px-3 py-2 text-xs text-amber-700">
+            This product still has <b>{product.currentStock} {product.unit}</b> in stock — that stock will no longer be counted after deleting.
+          </p>
+        )}
+        {error && <p className="text-sm text-red-600">{error}</p>}
+        <div className="flex justify-end gap-2">
+          <button onClick={onClose} className="rounded-lg border px-4 py-2 text-sm">Cancel</button>
+          <button onClick={confirmDelete} disabled={busy} className="flex items-center gap-1.5 rounded-xl bg-red-600 px-4 py-2 text-sm font-semibold text-white disabled:opacity-50">
+            <Trash2 size={15} /> {busy ? "Deleting…" : "Delete product"}
+          </button>
+        </div>
+      </div>
+    </Modal>
   );
 }
 

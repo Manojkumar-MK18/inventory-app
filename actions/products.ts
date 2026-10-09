@@ -448,3 +448,16 @@ export async function setSellable(raw: unknown): Promise<ActionResult> {
   revalidatePath("/pos");
   return { ok: true };
 }
+
+/** Delete a product (soft delete — keeps sale/stock history intact, hides it everywhere). */
+export async function deleteProduct(id: string): Promise<ActionResult> {
+  const ctx = await getContext();
+  requirePerm(ctx, "products");
+  if (typeof id !== "string" || id.length !== 24) return { ok: false, error: "Invalid product" };
+  await connectDB();
+  const updated = await productRepo(ctx).update(id, { isActive: false, sellable: false });
+  if (!updated) return { ok: false, error: "Product not found" };
+  revalidatePath("/products");
+  revalidatePath("/pos");
+  return { ok: true };
+}
