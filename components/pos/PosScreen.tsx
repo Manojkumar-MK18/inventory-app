@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Maximize, Minimize, ShoppingCart, Smartphone, X, Copy, Check } from "lucide-react";
+import { Maximize, Minimize, ShoppingCart, Smartphone, X, Copy, Check, Trash2 } from "lucide-react";
 import type { ProductDTO } from "@/actions/products";
 import { createSale, type SavedSale } from "@/actions/sales";
 import { computeBill, type GstType } from "@/lib/tax";
@@ -604,7 +604,7 @@ export function PosScreen({ products, businessName, gstin, gstType, pricesInclud
                     </td>
                     <td className="px-3 py-3 align-top">
                       <div className="flex h-9 items-center justify-center">
-                        <button onClick={() => removeLine(k)} className="text-gray-400 hover:text-red-500" title="Remove">✕</button>
+                        <button onClick={() => removeLine(k)} className="text-gray-400 hover:text-red-500" title="Remove item"><Trash2 size={16} /></button>
                       </div>
                     </td>
                   </tr>

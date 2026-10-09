@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { Plus, Pencil, Package, Search, Check, EyeOff, Barcode } from "lucide-react";
+import { Plus, Pencil, Package, Search, Check, EyeOff, Barcode, Trash2 } from "lucide-react";
 import { createProduct, updateProduct, adjustStock, adjustVariantStock, setSellable, markReady, type ProductDTO } from "@/actions/products";
 import { formatINR, toRupees } from "@/lib/money";
 import { UNITS, GST_RATES } from "@/lib/units";
@@ -397,7 +397,7 @@ function ProductForm({ product, categories, onClose, onSaved }: { product: Produ
                   )}
                   <input type="number" min={0} step="0.01" value={v.priceRupees} onChange={(e) => patchVariant(i, { priceRupees: e.target.value })} title="Sale price for this size" placeholder="599" className={`${inputCls} w-full`} />
                   <input type="number" min={0} value={v.minStock} onChange={(e) => patchVariant(i, { minStock: Math.max(0, Number(e.target.value)) })} title="Low-stock alert for this size" placeholder="0" className={`${inputCls} w-full`} />
-                  <button type="button" onClick={() => removeVariant(i)} className="flex justify-center text-red-400 hover:text-red-600" title="Remove size">✕</button>
+                  <button type="button" onClick={() => removeVariant(i)} className="flex justify-center text-gray-400 hover:text-red-600" title="Delete this size"><Trash2 size={15} /></button>
                 </div>
               ))}
               <button type="button" onClick={addVariant} className="mt-1 flex items-center gap-1 self-start rounded-md border border-gray-300 bg-white px-3 py-1.5 text-xs font-medium hover:bg-gray-100">
