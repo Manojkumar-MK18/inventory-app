@@ -21,6 +21,8 @@ import { PaymentModel } from "@/models/Payment";
 
 export type RefundMethod = "CASH" | "UPI" | "CARD" | "ADJUST_DUES";
 
+export type ReturnKind = "RETURN" | "EXCHANGE" | "DAMAGE";
+
 export interface ReturnLineInput {
   lineIndex: number; // index into the sale's items[]
   qty: number; // how many to return from that line
@@ -28,7 +30,10 @@ export interface ReturnLineInput {
 export interface CreateReturnInput {
   saleId: string;
   lines: ReturnLineInput[];
+  kind?: ReturnKind; // RETURN (default) | EXCHANGE | DAMAGE
   refundMethod?: RefundMethod;
+  exchangeSaleId?: mongoose.Types.ObjectId; // link to the new bill (exchanges)
+  exchangeInvoiceNo?: string;
   billedBy?: string;
   note?: string;
 }
@@ -64,6 +69,8 @@ export function returnRepo(ctx: Ctx) {
     async create(input: CreateReturnInput) {
       await connectDB();
       const method: RefundMethod = input.refundMethod ?? "CASH";
+      const kind: ReturnKind = input.kind ?? "RETURN";
+      const damaged = kind === "DAMAGE";
 
       const session = await mongoose.startSession();
       try {
@@ -90,23 +97,28 @@ export function returnRepo(ctx: Ctx) {
             const refundTotal = per * req.qty;
             totalRefund += refundTotal;
 
-            // Add stock back (to the right size for variant products).
+            // RETURN / EXCHANGE: item is resellable → back to sellable stock.
+            // DAMAGE: item is written off → add to damagedStock, NOT sellable stock.
             if (line.variantLabel) {
+              const inc = damaged
+                ? { "variants.$.damagedStock": req.qty, damagedStock: req.qty }
+                : { "variants.$.stock": req.qty, currentStock: req.qty };
               await ProductModel.updateOne(
                 { businessId: bId, _id: line.productId, variants: { $elemMatch: { label: line.variantLabel } } },
-                { $inc: { "variants.$.stock": req.qty, currentStock: req.qty } },
+                { $inc: inc },
                 { session }
               );
             } else {
+              const inc = damaged ? { damagedStock: req.qty } : { currentStock: req.qty };
               await ProductModel.updateOne(
                 { businessId: bId, _id: line.productId },
-                { $inc: { currentStock: req.qty } },
+                { $inc: inc },
                 { session }
               );
             }
 
             await StockMovementModel.create(
-              [{ businessId: bId, productId: line.productId, variantLabel: line.variantLabel ?? "", type: "SALE_RETURN", qty: req.qty, refType: "RETURN", date: now }],
+              [{ businessId: bId, productId: line.productId, variantLabel: line.variantLabel ?? "", type: damaged ? "DAMAGE" : "SALE_RETURN", qty: req.qty, refType: "RETURN", date: now }],
               { session }
             );
 
@@ -142,6 +154,9 @@ export function returnRepo(ctx: Ctx) {
                 businessId: bId,
                 returnNo,
                 date: now,
+                kind,
+                exchangeSaleId: input.exchangeSaleId,
+                exchangeInvoiceNo: input.exchangeInvoiceNo ?? "",
                 originalSaleId: sale._id,
                 originalInvoiceNo: sale.invoiceNo,
                 customerSnapshot: customerId

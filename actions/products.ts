@@ -38,6 +38,7 @@ export interface ProductDTO {
   costPrice: number; // paise — weighted-average buy cost (for deciding a sell price)
   taxRate: number;
   currentStock: number;
+  damagedStock: number; // written-off damaged pieces (not sellable)
   minStock: number;
   discount: number; // paise if discountUnit "₹", else percent
   discountUnit: "₹" | "%";
@@ -62,6 +63,7 @@ export async function listProducts(opts?: { sellableOnly?: boolean }): Promise<P
     costPrice: p.costPrice ?? 0,
     taxRate: p.taxRate ?? 0,
     currentStock: p.currentStock ?? 0,
+    damagedStock: p.damagedStock ?? 0,
     minStock: p.minStock ?? 0,
     discount: p.discount ?? 0,
     discountUnit: (p.discountUnit as "₹" | "%") ?? "₹",
@@ -323,7 +325,7 @@ export async function quickCreateProduct(raw: unknown): Promise<{ ok: true; prod
       ok: true,
       product: {
         id: p._id.toString(), name: p.name, sku: p.sku, barcode: null, hsn: null, unit: p.unit,
-        salePrice: 0, costPrice: 0, taxRate: 0, currentStock: 0, minStock: 0,
+        salePrice: 0, costPrice: 0, taxRate: 0, currentStock: 0, damagedStock: 0, minStock: 0,
         discount: 0, discountUnit: "₹", categoryName,
         variants: variants.map((v) => ({ label: v.label, barcode: "", stock: 0, minStock: 0, price: null })),
         sellable: false,

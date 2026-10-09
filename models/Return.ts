@@ -24,6 +24,11 @@ const returnSchema = new Schema(
   {
     returnNo: { type: String, required: true }, // e.g. RET/26-27/000004
     date: { type: Date, default: () => new Date() },
+    // RETURN = money back, item resellable; EXCHANGE = item resellable + new bill;
+    // DAMAGE = item written off (NOT back in sellable stock).
+    kind: { type: String, enum: ["RETURN", "EXCHANGE", "DAMAGE"], default: "RETURN" },
+    exchangeSaleId: { type: Schema.Types.ObjectId, ref: "Sale" }, // the new bill, for exchanges
+    exchangeInvoiceNo: { type: String, default: "" },
     originalSaleId: { type: Schema.Types.ObjectId, ref: "Sale", required: true },
     originalInvoiceNo: { type: String, required: true },
     customerSnapshot: {

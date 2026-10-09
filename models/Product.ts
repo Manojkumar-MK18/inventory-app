@@ -7,6 +7,7 @@ const variantSchema = new Schema(
     label: { type: String, required: true, maxlength: 20 }, // "S", "M", "32"
     barcode: { type: String, default: "" },
     stock: { type: Number, default: 0 },
+    damagedStock: { type: Number, default: 0 }, // damaged pieces of this size (not sellable)
     minStock: { type: Number, default: 0 }, // low-stock alert level for this size
     price: { type: Number, default: null }, // paise; null = use product salePrice
   },
@@ -29,6 +30,7 @@ const productSchema = new Schema(
     discount: { type: Number, default: 0 },
     discountUnit: { type: String, enum: ["₹", "%"], default: "₹" },
     currentStock: { type: Number, default: 0 }, // total; for variant products = sum of variant stock
+    damagedStock: { type: Number, default: 0 }, // total damaged pieces written off (not sellable)
     minStock: { type: Number, default: 0 },
     variants: { type: [variantSchema], default: [] }, // empty = simple product
     sellable: { type: Boolean, default: true }, // false = draft (stocked but not for sale yet)

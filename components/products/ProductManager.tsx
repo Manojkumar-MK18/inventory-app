@@ -128,6 +128,11 @@ export function ProductManager({ initial, categories, shopName, canEdit = true }
                       <span className={`inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-xs font-medium ${low ? "bg-red-50 text-red-600" : "bg-green-50 text-green-700"}`}>
                         {p.currentStock} {p.unit}
                       </span>
+                      {p.damagedStock > 0 && (
+                        <span className="rounded-full bg-orange-50 px-2 py-0.5 text-[10px] font-medium text-orange-600" title="Damaged pieces written off — not for sale">
+                          {p.damagedStock} damaged
+                        </span>
+                      )}
                       {low && p.variants.length === 0 && (
                         <span className="text-[10px] text-red-500">
                           Low{p.minStock > 0 ? ` · alert at ${p.minStock}` : ""}
