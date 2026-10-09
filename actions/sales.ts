@@ -8,6 +8,7 @@ import { BusinessModel } from "@/models/Business";
 import mongoose from "mongoose";
 import { SaleModel } from "@/models/Sale";
 import { CustomerModel } from "@/models/Customer";
+import { ProductModel } from "@/models/Product";
 import { saleRepo, type BusinessConfig } from "@/repositories/saleRepo";
 import { createSaleSchema, backdatedSaleSchema } from "@/schemas/sale";
 
@@ -245,9 +246,17 @@ export async function createBackdatedSale(raw: unknown): Promise<SaleResult> {
 export async function getSale(id: string): Promise<SavedSale | null> {
   const ctx = await getContext();
   await connectDB();
-  const sale = await SaleModel.findOne({
-    businessId: new mongoose.Types.ObjectId(ctx.businessId),
-    _id: id,
-  }).lean();
-  return sale ? toSavedSale(sale) : null;
+  const bId = new mongoose.Types.ObjectId(ctx.businessId);
+  const sale: any = await SaleModel.findOne({ businessId: bId, _id: id }).lean();
+  if (!sale) return null;
+
+  // Old bills didn't snapshot the SKU — backfill it from the product (by its id).
+  const needSku = (sale.items ?? []).some((i: any) => !i.sku && i.productId);
+  if (needSku) {
+    const ids = [...new Set((sale.items ?? []).filter((i: any) => i.productId).map((i: any) => i.productId.toString()))];
+    const prods = await ProductModel.find({ businessId: bId, _id: { $in: ids } }, { sku: 1 }).lean();
+    const skuById = new Map(prods.map((p: any) => [p._id.toString(), p.sku]));
+    for (const i of sale.items ?? []) if (!i.sku && i.productId) i.sku = skuById.get(i.productId.toString()) ?? "";
+  }
+  return toSavedSale(sale);
 }
