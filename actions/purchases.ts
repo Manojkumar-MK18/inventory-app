@@ -223,6 +223,9 @@ export async function deletePurchase(id: string): Promise<ActionResult> {
   for (const it of p.items ?? []) {
     const prod: any = await ProductModel.findOne({ businessId: bId, _id: it.productId });
     if (!prod) continue;
+    // If this size was later removed from the product, its stock is already gone —
+    // nothing to reverse, so don't block (and we'll skip the decrement below).
+    if (it.variantLabel && !(prod.variants ?? []).some((v: any) => v.label === it.variantLabel)) continue;
     const have = it.variantLabel
       ? (prod.variants ?? []).find((v: any) => v.label === it.variantLabel)?.stock ?? 0
       : prod.currentStock;

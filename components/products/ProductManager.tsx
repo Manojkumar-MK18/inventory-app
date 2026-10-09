@@ -325,7 +325,7 @@ function ProductForm({ product, categories, onClose, onSaved }: { product: Produ
       const v = vs[i];
       // Confirm before deleting a size that already has stock (data would be lost on save).
       if (v && v.existingStock != null && v.existingStock > 0) {
-        if (!confirm(`Delete size "${v.label}"? It currently has ${v.existingStock} in stock — that stock will be removed when you save.`)) return vs;
+        if (!confirm(`Delete size "${v.label}"? It currently has ${v.existingStock} in stock — that stock will be removed when you save.\n\nNote: this only changes the product. Past purchases of this size are kept (they are a record of what you bought). To undo a purchase, edit or delete it on the Purchases page.`)) return vs;
       }
       return vs.filter((_, idx) => idx !== i);
     });
