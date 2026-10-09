@@ -247,7 +247,15 @@ function ProductForm({ product, categories, onClose, onSaved }: { product: Produ
 
   const addVariant = () => setVariants((vs) => [...vs, { label: "", barcode: "", openingStock: 0, minStock: 0, priceRupees: "", existingStock: null }]);
   const patchVariant = (i: number, p: Partial<VariantRow>) => setVariants((vs) => vs.map((v, idx) => (idx === i ? { ...v, ...p } : v)));
-  const removeVariant = (i: number) => setVariants((vs) => vs.filter((_, idx) => idx !== i));
+  const removeVariant = (i: number) =>
+    setVariants((vs) => {
+      const v = vs[i];
+      // Confirm before deleting a size that already has stock (data would be lost on save).
+      if (v && v.existingStock != null && v.existingStock > 0) {
+        if (!confirm(`Delete size "${v.label}"? It currently has ${v.existingStock} in stock — that stock will be removed when you save.`)) return vs;
+      }
+      return vs.filter((_, idx) => idx !== i);
+    });
 
   async function onSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -493,7 +501,7 @@ function ReadyModal({ product, onClose, onSaved }: { product: ProductDTO; onClos
   const [error, setError] = useState("");
   const [saving, setSaving] = useState(false);
   // Pre-fill with any existing prices so the user can just confirm or change them.
-  const [taxRate, setTaxRate] = useState(String(product.taxRate ?? 0));
+  const [taxRate] = useState(String(product.taxRate ?? 0)); // kept from the product; edit it via Edit
   const [singlePrice, setSinglePrice] = useState(product.salePrice > 0 ? String(toRupees(product.salePrice)) : "");
   // Per-size prices, pre-filled with each size's price or the product fallback.
   const [prices, setPrices] = useState<Record<string, string>>(
@@ -570,13 +578,7 @@ function ReadyModal({ product, onClose, onSaved }: { product: ProductDTO; onClos
           </Field>
         )}
 
-        <Field label="GST rate" hint="GST % charged on this item. 0% if GST does not apply.">
-          <select value={taxRate} onChange={(e) => setTaxRate(e.target.value)} className={`${inputCls} w-48`}>
-            {GST_RATES.map((r) => <option key={r} value={r}>{r}%</option>)}
-          </select>
-        </Field>
-
-        <p className="text-xs text-gray-400">Tip: add HSN, category or more sizes anytime via Edit.</p>
+        <p className="text-xs text-gray-400">Tip: add HSN, category, GST rate or more sizes anytime via Edit.</p>
         {error && <p className="text-sm text-red-600">{error}</p>}
         <div className="flex justify-end gap-2">
           <button type="button" onClick={onClose} className="rounded-lg border px-4 py-2 text-sm">Cancel</button>
