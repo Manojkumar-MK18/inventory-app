@@ -224,6 +224,7 @@ export function saleRepo(ctx: Ctx, cfg: BusinessConfig) {
             return {
               productId: p._id,
               name: item.variantLabel ? `${p.name} (${item.variantLabel})` : p.name,
+              sku: p.sku ?? "",
               hsn: p.hsn,
               variantLabel: item.variantLabel ?? "",
               barcode,

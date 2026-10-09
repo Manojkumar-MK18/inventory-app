@@ -5,7 +5,7 @@ const sale = {
   invoiceNo: "INV/26-27/000001",
   date: new Date("2026-10-02T10:00:00Z").toISOString(),
   items: [
-    { name: "Shirt", hsn: null, qty: 2, price: 52500, discount: 2000, taxRate: 5, taxable: 98000, cgst: 2450, sgst: 2450, igst: 0 },
+    { name: "Shirt", sku: "SH-01", hsn: null, qty: 2, price: 52500, discount: 2000, taxRate: 5, taxable: 98000, cgst: 2450, sgst: 2450, igst: 0 },
   ],
   totals: { taxable: 98000, cgst: 2450, sgst: 2450, igst: 0, grandTotal: 102900 },
   roundOff: 0,
@@ -38,6 +38,7 @@ describe("whatsapp message + url", () => {
     expect(m).toContain("-₹20.00"); // item discount line
     expect(m).toContain("₹1029.00"); // grand total (monospace, no thousands comma)
     expect(m).toContain("```"); // body is inside a monospace block
+    expect(m).toContain("#SH-01"); // product code under the item
   });
   it("includes the shop footer: address, phone, instagram and maps", () => {
     const m = billMessage(sale, {

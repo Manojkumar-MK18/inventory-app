@@ -49,10 +49,10 @@ export function Receipt({
             return (
               <Fragment key={idx}>
                 <tr>
-                  <td className="pr-1">{i.name}</td>
-                  <td className="text-right">{i.qty}</td>
-                  <td className="text-right">{formatINR(i.price)}</td>
-                  <td className="text-right">{formatINR(lineTotal)}</td>
+                  <td className="pr-1">{i.name}{i.sku ? <span className="block text-[9px] text-gray-500">#{i.sku}</span> : null}</td>
+                  <td className="text-right align-top">{i.qty}</td>
+                  <td className="text-right align-top">{formatINR(i.price)}</td>
+                  <td className="text-right align-top">{formatINR(lineTotal)}</td>
                 </tr>
                 {i.discount > 0 && (
                   <tr className="text-green-700">

@@ -24,6 +24,7 @@ export interface SavedSale {
   date: string;
   items: {
     name: string;
+    sku: string;
     hsn: string | null;
     qty: number;
     price: number;
@@ -54,6 +55,7 @@ function toSavedSale(sale: any): SavedSale {
     date: new Date(sale.date).toISOString(),
     items: sale.items.map((i: any) => ({
       name: i.name,
+      sku: i.sku ?? "",
       hsn: i.hsn ?? null,
       qty: i.qty,
       price: i.price,

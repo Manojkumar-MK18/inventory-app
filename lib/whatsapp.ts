@@ -54,14 +54,15 @@ export function billMessage(sale: SavedSale, shop: ShopInfo | string): string {
   const clip = (x: string) => (x.length > C.name ? x.slice(0, C.name - 1) + "." : x);
   const itemHead =
     "Item".padEnd(C.name) + "Qty".padStart(C.qty) + "Rate".padStart(C.rate) + "Amt".padStart(C.amt);
-  const itemRows = sale.items.map((i) => {
+  const itemRows = sale.items.flatMap((i) => {
     const amt = i.taxable + i.cgst + i.sgst + i.igst;
-    return (
+    const row =
       clip(i.name).padEnd(C.name) +
       String(i.qty).padStart(C.qty) +
       num(i.price).padStart(C.rate) +
-      num(amt).padStart(C.amt)
-    );
+      num(amt).padStart(C.amt);
+    // Put the product code on its own indented line under the item name.
+    return i.sku ? [row, `  #${i.sku}`] : [row];
   });
 
   const t = sale.totals;

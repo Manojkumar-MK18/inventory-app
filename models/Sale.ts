@@ -6,6 +6,7 @@ const saleItemSchema = new Schema(
   {
     productId: { type: Schema.Types.ObjectId, ref: "Product", required: true },
     name: String, // snapshot
+    sku: { type: String, default: "" }, // snapshot — product code, printed on bills
     hsn: String, // snapshot
     variantLabel: { type: String, default: "" }, // size, snapshot (for returns + stock)
     barcode: { type: String, default: "" }, // snapshot — lets returns find the item by scan
