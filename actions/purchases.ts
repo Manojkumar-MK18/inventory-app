@@ -31,7 +31,7 @@ export interface PurchaseDetail {
   supplierInvoiceNo: string;
   paymentMethod: string;
   totalCost: number;
-  items: { productId: string; variantLabel: string; name: string; qty: number; cost: number; lineTotal: number }[];
+  items: { productId: string; variantLabel: string; name: string; sku: string; qty: number; cost: number; lineTotal: number }[];
 }
 
 export async function listPurchases(limit = 100): Promise<PurchaseListRow[]> {
@@ -84,6 +84,10 @@ export async function getPurchase(id: string): Promise<PurchaseDetail | null> {
     _id: id,
   }).lean();
   if (!p) return null;
+  // Look up each product's SKU/code to show alongside the item name.
+  const ids = [...new Set((p.items ?? []).map((i: any) => i.productId.toString()))];
+  const prods = await ProductModel.find({ businessId: new mongoose.Types.ObjectId(ctx.businessId), _id: { $in: ids } }, { sku: 1 }).lean();
+  const skuById = new Map(prods.map((pr: any) => [pr._id.toString(), pr.sku]));
   return {
     id: p._id.toString(),
     date: new Date(p.date).toISOString(),
@@ -95,6 +99,7 @@ export async function getPurchase(id: string): Promise<PurchaseDetail | null> {
       productId: i.productId.toString(),
       variantLabel: i.variantLabel ?? "",
       name: i.name,
+      sku: skuById.get(i.productId.toString()) ?? "",
       qty: i.qty,
       cost: i.cost,
       lineTotal: i.qty * i.cost,

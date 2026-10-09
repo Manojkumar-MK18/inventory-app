@@ -487,7 +487,7 @@ function PurchaseViewModal({ id, onClose }: { id: string; onClose: () => void })
               <tbody className="divide-y divide-gray-100">
                 {data.items.map((i, idx) => (
                   <tr key={idx}>
-                    <td className="py-2">{i.name}</td>
+                    <td className="py-2">{i.name}{i.sku && <span className="ml-1.5 text-xs text-gray-400">{i.sku}</span>}</td>
                     <td className="text-right">{i.qty}</td>
                     <td className="text-right">{formatINR(i.cost)}</td>
                     <td className="text-right font-medium">{formatINR(i.lineTotal)}</td>
