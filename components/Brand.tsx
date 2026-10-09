@@ -3,6 +3,7 @@ import { Store } from "lucide-react";
 export const COMPANY = "Knowtech Labs";
 export const APP_NAME = "POS & Inventory";
 export const COPYRIGHT_YEAR = 2026;
+export const APP_VERSION = "v1.0.0"; // bump on each release
 
 /** Logo mark + app name. Used on auth screens and onboarding. */
 export function BrandMark({ subtitle }: { subtitle?: string }) {
@@ -19,11 +20,11 @@ export function BrandMark({ subtitle }: { subtitle?: string }) {
   );
 }
 
-/** Copyright line. */
+/** Copyright line with the app version. */
 export function Copyright({ className = "" }: { className?: string }) {
   return (
     <p className={`text-xs text-gray-400 ${className}`}>
-      © {COPYRIGHT_YEAR} {COMPANY} · All rights reserved.
+      © {COPYRIGHT_YEAR} {COMPANY} · {APP_VERSION}
     </p>
   );
 }

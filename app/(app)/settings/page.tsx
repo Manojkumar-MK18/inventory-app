@@ -3,6 +3,7 @@ import { listStaff } from "@/actions/staff";
 import { getContext, requireOwner } from "@/lib/context";
 import { SettingsForm } from "@/components/settings/SettingsForm";
 import { StaffManager } from "@/components/settings/StaffManager";
+import { COMPANY, APP_NAME, APP_VERSION } from "@/components/Brand";
 
 export default async function SettingsPage() {
   await requireOwner();
@@ -24,6 +25,10 @@ export default async function SettingsPage() {
       ) : (
         <p className="text-sm text-gray-400">Only the shop owner can manage team logins.</p>
       )}
+
+      <p className="text-center text-xs text-gray-400">
+        {COMPANY} · {APP_NAME} · {APP_VERSION}
+      </p>
     </div>
   );
 }
