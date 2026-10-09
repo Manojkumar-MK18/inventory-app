@@ -536,12 +536,25 @@ function ReadyModal({ product, onClose, onSaved }: { product: ProductDTO; onClos
               : "Set the price you'll sell this at. It then appears in billing."}
         </p>
 
+        {product.costPrice > 0 && (
+          <p className="rounded-lg bg-amber-50 px-3 py-2 text-xs text-amber-700">
+            You bought this at <b>{formatINR(product.costPrice)}</b> per piece — set the selling price above this to make a profit.
+          </p>
+        )}
+
         {hasVariants ? (
           <div className="flex flex-col gap-2">
+            <div className="flex items-center gap-3 text-[11px] font-semibold uppercase tracking-wide text-gray-400">
+              <span className="w-16 text-center">Size</span>
+              <span className="w-24">Bought at</span>
+              <span className="w-20">Stock</span>
+              <span className="ml-auto w-40">Sell price</span>
+            </div>
             {product.variants.map((v) => (
               <div key={v.label} className="flex items-center gap-3">
                 <span className="w-16 rounded bg-gray-100 px-2 py-1 text-center text-sm font-medium">{v.label}</span>
-                <span className="text-xs text-gray-400">{v.stock} in stock</span>
+                <span className="w-24 text-sm text-gray-700">{product.costPrice > 0 ? formatINR(product.costPrice) : "—"}</span>
+                <span className="w-20 text-xs text-gray-400">{v.stock} in stock</span>
                 <div className="relative ml-auto w-40">
                   <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm text-gray-400">₹</span>
                   <input type="number" step="0.01" min={0} value={prices[v.label] ?? ""}

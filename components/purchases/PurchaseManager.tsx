@@ -299,7 +299,11 @@ function PurchaseForm({ products, supplierNames, categories, edit, onClose, onSa
                 const k = pKey(l.product.id, l.variantLabel);
                 return (
                 <tr key={k} className="border-b">
-                  <td className="py-2">{l.product.name}{l.variantLabel && <span className="ml-1 rounded bg-gray-100 px-1.5 py-0.5 text-xs">{l.variantLabel}</span>}</td>
+                  <td className="py-2">
+                    <span className="font-medium">{l.product.name}</span>
+                    {l.variantLabel && <span className="ml-1 rounded bg-gray-100 px-1.5 py-0.5 text-xs">{l.variantLabel}</span>}
+                    <span className="ml-1.5 text-xs text-gray-400">{l.product.sku}</span>
+                  </td>
                   <td><input type="number" min={1} value={l.qty} onChange={(e) => patch(k, { qty: Math.max(1, Number(e.target.value)) })} className="w-16 rounded border px-2 py-1" /></td>
                   <td><input type="number" min={0} step="0.01" value={l.costRupees} onChange={(e) => patch(k, { costRupees: Math.max(0, Number(e.target.value)) })} className="w-24 rounded border px-2 py-1" /></td>
                   <td className="text-right">{formatINR(Math.round(l.qty * l.costRupees * 100))}</td>
