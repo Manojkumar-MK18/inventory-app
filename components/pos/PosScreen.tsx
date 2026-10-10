@@ -558,7 +558,8 @@ export function PosScreen({ products, businessName, gstin, gstType, pricesInclud
                       </div>
                     </td>
                     <td className="px-3 py-3 align-top">
-                      <input type="number" min={0} step="0.01" value={l.priceRupees}
+                      <input type="number" min={0} step="0.01" value={l.priceRupees || ""} placeholder="0"
+                        onFocus={(e) => e.currentTarget.select()}
                         onChange={(e) => updateLine(k, { priceRupees: Math.max(0, Number(e.target.value)) })}
                         className="h-9 w-20 rounded border px-2" />
                     </td>
@@ -570,6 +571,7 @@ export function PosScreen({ products, businessName, gstin, gstType, pricesInclud
                         return (
                           <>
                             <input type="number" min={1} value={l.qty}
+                              onFocus={(e) => e.currentTarget.select()}
                               onChange={(e) => updateLine(k, { qty: Math.max(1, Number(e.target.value)) })}
                               className={`h-9 w-16 rounded border px-2 ${over ? "border-red-400 bg-red-50" : ""}`} />
                             <div className={`mt-1 text-[10px] font-medium ${over || low ? "text-red-500" : "text-gray-400"}`}>
@@ -585,7 +587,8 @@ export function PosScreen({ products, businessName, gstin, gstType, pricesInclud
                     </td>
                     <td className="px-3 py-3 align-top">
                       <div className="flex items-center gap-1">
-                        <input type="number" min={0} step="0.01" value={l.discountValue}
+                        <input type="number" min={0} step="0.01" value={l.discountValue || ""} placeholder="0"
+                          onFocus={(e) => e.currentTarget.select()}
                           onChange={(e) => updateLine(k, { discountValue: Math.max(0, Number(e.target.value)) })}
                           className={`h-9 w-16 rounded border px-2 ${discountPaise(l) > toPaise(l.priceRupees || 0) * l.qty ? "border-red-400" : ""}`} />
                         <select value={l.discountUnit}

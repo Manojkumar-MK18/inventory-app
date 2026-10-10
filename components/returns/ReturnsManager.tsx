@@ -168,7 +168,8 @@ export function ReturnsManager({ initialReturns, products }: { initialReturns: R
                       <td className="px-4 py-3 text-right tabular-nums">{l.qtyReturned}</td>
                       <td className="px-4 py-3 text-right tabular-nums">{formatINR(l.refundPerUnit)}</td>
                       <td className="px-4 py-3 text-center">
-                        <input type="number" min={0} max={l.qtyLeft} value={q} disabled={disabled}
+                        <input type="number" min={0} max={l.qtyLeft} value={q || ""} placeholder="0" disabled={disabled}
+                          onFocus={(e) => e.currentTarget.select()}
                           onChange={(e) => setQtys((s) => ({ ...s, [l.lineIndex]: Math.max(0, Math.min(l.qtyLeft, Number(e.target.value))) }))}
                           className="w-16 rounded border px-2 py-1 text-center disabled:bg-gray-100" />
                         <span className="ml-1 text-xs text-gray-400">/ {l.qtyLeft}</span>
@@ -213,8 +214,8 @@ export function ReturnsManager({ initialReturns, products }: { initialReturns: R
                         return (
                           <tr key={k}>
                             <td className="px-3 py-2 font-medium">{l.product.name}{l.variantLabel && <span className="ml-1 rounded bg-gray-100 px-1.5 py-0.5 text-xs">{l.variantLabel}</span>}</td>
-                            <td className="px-3 py-2"><input type="number" min={0} step="0.01" value={l.priceRupees} onChange={(e) => patchNew(k, { priceRupees: Math.max(0, Number(e.target.value)) })} className="h-8 w-20 rounded border px-2" /></td>
-                            <td className="px-3 py-2"><input type="number" min={1} value={l.qty} onChange={(e) => patchNew(k, { qty: Math.max(1, Number(e.target.value)) })} className="h-8 w-16 rounded border px-2" /></td>
+                            <td className="px-3 py-2"><input type="number" min={0} step="0.01" value={l.priceRupees || ""} placeholder="0" onFocus={(e) => e.currentTarget.select()} onChange={(e) => patchNew(k, { priceRupees: Math.max(0, Number(e.target.value)) })} className="h-8 w-20 rounded border px-2" /></td>
+                            <td className="px-3 py-2"><input type="number" min={1} value={l.qty} onFocus={(e) => e.currentTarget.select()} onChange={(e) => patchNew(k, { qty: Math.max(1, Number(e.target.value)) })} className="h-8 w-16 rounded border px-2" /></td>
                             <td className="px-3 py-2 text-right font-medium tabular-nums">{formatINR(Math.round(l.qty * l.priceRupees * 100))}</td>
                             <td className="px-3 py-2 text-right"><button onClick={() => removeNew(k)} className="text-gray-400 hover:text-red-500"><Trash2 size={15} /></button></td>
                           </tr>

@@ -400,8 +400,8 @@ function ProductForm({ product, categories, onClose, onSaved }: { product: Produ
           </Field>
         ) : (
           <Field label="Sale price (₹)" hint="The price you sell at, per unit, in rupees. You can still change it on each bill.">
-            <input name="salePriceRupees" type="number" step="0.01" required
-              defaultValue={product ? toRupees(product.salePrice) : ""} placeholder="525.00" className={inputCls} />
+            <input name="salePriceRupees" type="number" step="0.01" required onFocus={(e) => e.currentTarget.select()}
+              defaultValue={product ? (product.salePrice ? toRupees(product.salePrice) : "") : ""} placeholder="525.00" className={inputCls} />
           </Field>
         )}
         <Field label="GST rate" hint="The GST % charged on this item. Printed on the tax invoice. Choose 0% if GST does not apply.">
@@ -425,7 +425,7 @@ function ProductForm({ product, categories, onClose, onSaved }: { product: Produ
         </Field>
         {!editing && !hasVariants && (
           <Field label="Opening stock" hint="How many you have in hand right now. You can adjust it anytime from the Stock button.">
-            <input name="openingStock" type="number" min={0} defaultValue={0} className={inputCls} />
+            <input name="openingStock" type="number" min={0} defaultValue="" placeholder="0" className={inputCls} />
           </Field>
         )}
         {hasVariants ? (
@@ -434,7 +434,7 @@ function ProductForm({ product, categories, onClose, onSaved }: { product: Produ
           <input type="hidden" name="minStock" value={product?.minStock ?? 0} />
         ) : (
           <Field label="Low-stock alert at" hint="You'll see a low-stock warning when the quantity falls to this number. Set 0 for no alert.">
-            <input name="minStock" type="number" min={0} defaultValue={product?.minStock ?? 0} className={inputCls} />
+            <input name="minStock" type="number" min={0} defaultValue={product?.minStock || ""} placeholder="0" className={inputCls} />
           </Field>
         )}
 
@@ -466,10 +466,10 @@ function ProductForm({ product, categories, onClose, onSaved }: { product: Produ
                   {v.existingStock != null ? (
                     <span className="text-sm text-gray-600" title="Change stock from the Stock button on the product list">{v.existingStock}</span>
                   ) : (
-                    <input type="number" min={0} value={v.openingStock} onChange={(e) => patchVariant(i, { openingStock: Math.max(0, Number(e.target.value)) })} className={`${inputCls} w-full`} />
+                    <input type="number" min={0} value={v.openingStock || ""} placeholder="0" onChange={(e) => patchVariant(i, { openingStock: Math.max(0, Number(e.target.value)) })} className={`${inputCls} w-full`} />
                   )}
-                  <input type="number" min={0} step="0.01" value={v.priceRupees} onChange={(e) => patchVariant(i, { priceRupees: e.target.value })} title="Sale price for this size" placeholder="599" className={`${inputCls} w-full`} />
-                  <input type="number" min={0} value={v.minStock} onChange={(e) => patchVariant(i, { minStock: Math.max(0, Number(e.target.value)) })} title="Low-stock alert for this size" placeholder="0" className={`${inputCls} w-full`} />
+                  <input type="number" min={0} step="0.01" value={v.priceRupees} onFocus={(e) => e.currentTarget.select()} onChange={(e) => patchVariant(i, { priceRupees: e.target.value })} title="Sale price for this size" placeholder="599" className={`${inputCls} w-full`} />
+                  <input type="number" min={0} value={v.minStock || ""} placeholder="0" onChange={(e) => patchVariant(i, { minStock: Math.max(0, Number(e.target.value)) })} title="Low-stock alert for this size" className={`${inputCls} w-full`} />
                   <button type="button" onClick={() => removeVariant(i)} className="flex justify-center text-gray-400 hover:text-red-600" title="Delete this size"><Trash2 size={15} /></button>
                 </div>
               ))}
@@ -483,8 +483,8 @@ function ProductForm({ product, categories, onClose, onSaved }: { product: Produ
         <div className="col-span-2">
           <Field label="Standard discount (optional)" hint="A default discount auto-filled on bills for this product. Choose ₹ for a flat amount per unit, or % for a percentage. Leave 0 for none.">
             <div className="flex gap-2">
-              <input name="discountValue" type="number" min={0} step="0.01"
-                defaultValue={product ? (product.discountUnit === "₹" ? toRupees(product.discount) : product.discount) : 0}
+              <input name="discountValue" type="number" min={0} step="0.01" placeholder="0"
+                defaultValue={product ? ((product.discountUnit === "₹" ? toRupees(product.discount) : product.discount) || "") : ""}
                 className={`${inputCls} flex-1`} />
               <select name="discountUnit" defaultValue={product?.discountUnit ?? "₹"} className={`${inputCls} w-20`}>
                 <option value="₹">₹</option>
@@ -544,7 +544,7 @@ function StockModal({ product, onClose, onSaved }: { product: ProductDTO; onClos
               <div key={v.label} className="flex items-center gap-3">
                 <span className="w-16 rounded bg-gray-100 px-2 py-1 text-center text-sm font-medium">{v.label}</span>
                 <span className="text-xs text-gray-400">now {v.stock}</span>
-                <input type="number" min={0} value={counts[v.label]} onChange={(e) => setCounts((c) => ({ ...c, [v.label]: Math.max(0, Number(e.target.value)) }))} className={`${inputCls} ml-auto w-28`} />
+                <input type="number" min={0} value={counts[v.label] || ""} placeholder="0" onChange={(e) => setCounts((c) => ({ ...c, [v.label]: Math.max(0, Number(e.target.value)) }))} className={`${inputCls} ml-auto w-28`} />
               </div>
             ))}
           </div>
@@ -552,7 +552,7 @@ function StockModal({ product, onClose, onSaved }: { product: ProductDTO; onClos
           <>
             <p className="text-sm text-gray-500">Current stock: <b>{product.currentStock} {product.unit}</b></p>
             <Field label="New stock count">
-              <input type="number" min={0} value={single} onChange={(e) => setSingle(Math.max(0, Number(e.target.value)))} className={inputCls} autoFocus />
+              <input type="number" min={0} value={single || ""} placeholder="0" onChange={(e) => setSingle(Math.max(0, Number(e.target.value)))} className={inputCls} autoFocus />
             </Field>
           </>
         )}
@@ -638,7 +638,7 @@ function ReadyModal({ product, onClose, onSaved }: { product: ProductDTO; onClos
                 <span className="w-20 text-xs text-gray-400">{v.stock} in stock</span>
                 <div className="relative ml-auto w-40">
                   <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm text-gray-400">₹</span>
-                  <input type="number" step="0.01" min={0} value={prices[v.label] ?? ""}
+                  <input type="number" step="0.01" min={0} value={prices[v.label] ?? ""} onFocus={(e) => e.currentTarget.select()}
                     onChange={(e) => setPrices((p) => ({ ...p, [v.label]: e.target.value }))}
                     placeholder="price" className={`${inputCls} w-full pl-7`} />
                 </div>

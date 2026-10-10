@@ -193,7 +193,7 @@ function SettleModal({ party, settleLabel, onSettle, onClose, onSaved }: { party
         <p className="text-sm text-gray-500">Outstanding: <b>{formatINR(party.balanceDue)}</b></p>
         <div className="relative">
           <IndianRupee size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
-          <input name="amount" type="number" min={1} step="0.01" required max={party.balanceDue / 100}
+          <input name="amount" type="number" min={1} step="0.01" required max={party.balanceDue / 100} onFocus={(e) => e.currentTarget.select()}
             defaultValue={(party.balanceDue / 100).toFixed(2)} className={`${inputCls} pl-8`} autoFocus />
         </div>
         <select name="method" className={inputCls} defaultValue="CASH">
