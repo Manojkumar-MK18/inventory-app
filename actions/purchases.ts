@@ -15,6 +15,13 @@ import { createPurchaseSchema, editPurchaseSchema } from "@/schemas/purchase";
 
 export type ActionResult = { ok: true } | { ok: false; error: string };
 
+const IST_MS = 5.5 * 60 * 60 * 1000;
+/** yyyy-mm-dd (IST) -> a Date at noon IST that day (so the day is unambiguous). */
+function ymdToNoonIst(ymd: string): Date {
+  const [y, m, d] = ymd.split("-").map(Number);
+  return new Date(Date.UTC(y, m - 1, d, 12, 0, 0) - IST_MS);
+}
+
 export interface PurchaseListRow {
   id: string;
   date: string;
@@ -78,6 +85,7 @@ export async function createPurchase(raw: unknown): Promise<ActionResult> {
       supplierName: d.supplierName || "",
       supplierInvoiceNo: d.supplierInvoiceNo || "",
       paymentMethod: d.paymentMethod,
+      date: d.dateYmd ? ymdToNoonIst(d.dateYmd) : undefined,
       items: d.items.map((i) => ({ productId: i.productId, qty: i.qty, cost: toPaise(i.costRupees), variantLabel: i.variantLabel })),
     });
   } catch (e: any) {

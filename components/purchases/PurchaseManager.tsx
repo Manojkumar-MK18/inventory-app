@@ -170,6 +170,7 @@ function PurchaseForm({ products, supplierNames, categories, edit, onClose, onSa
   const [showQuick, setShowQuick] = useState(false);
   const [extraProducts, setExtraProducts] = useState<ProductDTO[]>([]); // quick-created this session
   const [picked, setPicked] = useState<PEntry[]>([]); // multi-select in the search dropdown
+  const todayYmd = new Date().toLocaleDateString("en-CA", { timeZone: "Asia/Kolkata" }); // yyyy-mm-dd (IST)
 
   // De-duplicate by product id so a product that's in both lists isn't shown twice.
   const allProducts = useMemo(() => {
@@ -220,6 +221,7 @@ function PurchaseForm({ products, supplierNames, categories, edit, onClose, onSa
       supplierName: f.get("supplierName") || "",
       supplierInvoiceNo: f.get("supplierInvoiceNo") || "",
       paymentMethod: payMethod,
+      dateYmd: f.get("dateYmd") || "",
       items: lines.map((l) => ({ productId: l.product.id, qty: l.qty, costRupees: l.costRupees, variantLabel: l.variantLabel })),
     };
     const res = isEdit ? await editPurchase({ ...payload, id: edit!.id }) : await createPurchase(payload);
@@ -243,6 +245,11 @@ function PurchaseForm({ products, supplierNames, categories, edit, onClose, onSa
             <Field label="Supplier invoice # (optional)" hint="The bill number on the supplier's invoice, for your records.">
               <input name="supplierInvoiceNo" defaultValue={edit?.supplierInvoiceNo ?? ""} placeholder="e.g. 4521" className={`${inputCls} w-full`} />
             </Field>
+            {!isEdit && (
+              <Field label="Purchase date" hint="When you bought the goods. Defaults to today — change it for an older purchase.">
+                <input name="dateYmd" type="date" max={todayYmd} defaultValue={todayYmd} className={`${inputCls} w-full`} />
+              </Field>
+            )}
           </div>
 
           <div className="flex items-center gap-2">

@@ -25,6 +25,7 @@ export interface CreatePurchaseInput {
   supplierName?: string;
   supplierInvoiceNo?: string;
   paymentMethod?: "PAID" | "CREDIT";
+  date?: Date; // purchase date (defaults to now)
   items: PurchaseLine[];
 }
 
@@ -41,6 +42,7 @@ export function purchaseRepo(ctx: Ctx) {
   return {
     async create(input: CreatePurchaseInput) {
       await connectDB();
+      const when = input.date ?? new Date();
       const ids = input.items.map((i) => new mongoose.Types.ObjectId(i.productId));
 
       const session = await mongoose.startSession();
@@ -77,7 +79,7 @@ export function purchaseRepo(ctx: Ctx) {
               );
             }
             await StockMovementModel.create(
-              [{ businessId: bId, productId: p._id, variantLabel: line.variantLabel ?? "", type: "PURCHASE", qty: line.qty, refType: "PURCHASE" }],
+              [{ businessId: bId, productId: p._id, variantLabel: line.variantLabel ?? "", type: "PURCHASE", qty: line.qty, refType: "PURCHASE", date: when }],
               { session }
             );
 
@@ -112,6 +114,7 @@ export function purchaseRepo(ctx: Ctx) {
                   businessId: bId,
                   supplierName: input.supplierName ?? "",
                   supplierInvoiceNo: input.supplierInvoiceNo ?? "",
+                  date: when,
                   items,
                   totalCost,
                   paymentMethod: input.paymentMethod ?? "PAID",

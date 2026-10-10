@@ -11,6 +11,7 @@ export const createPurchaseSchema = z.object({
   supplierName: z.string().max(200).optional().or(z.literal("")),
   supplierInvoiceNo: z.string().max(50).optional().or(z.literal("")),
   paymentMethod: z.enum(["PAID", "CREDIT"]).default("PAID"),
+  dateYmd: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional().or(z.literal("")), // purchase date; defaults to today
   items: z.array(purchaseLineSchema).min(1, "Add at least one item"),
 });
 
