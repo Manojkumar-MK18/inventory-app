@@ -6,13 +6,14 @@ import { useRouter } from "next/navigation";
 import { signOut } from "next-auth/react";
 import { CalendarDays, LogIn, LogOut, Power } from "lucide-react";
 import { checkIn, checkOut, type TodayStatus } from "@/actions/attendance";
+import { AccountSwitcher } from "@/components/AccountSwitcher";
 
 function fmtTime(iso: string | null) {
   if (!iso) return "";
   return new Date(iso).toLocaleTimeString("en-IN", { timeZone: "Asia/Kolkata", hour: "2-digit", minute: "2-digit", second: "2-digit" });
 }
 
-export function AppHeader({ status, today }: { status: TodayStatus; today: string }) {
+export function AppHeader({ status, today, role, currentEmail }: { status: TodayStatus; today: string; role?: string; currentEmail?: string }) {
   const router = useRouter();
   const [busy, setBusy] = useState(false);
 
@@ -49,6 +50,8 @@ export function AppHeader({ status, today }: { status: TodayStatus; today: strin
             {status.sessions} session{status.sessions > 1 ? "s" : ""} today
           </span>
         )}
+
+        {role === "OWNER" && <AccountSwitcher currentEmail={currentEmail ?? ""} />}
 
         <Link href="/attendance" title="Attendance calendar"
           className="flex h-11 w-11 items-center justify-center rounded-xl border border-gray-200 bg-white text-gray-500 hover:border-brand-200 hover:bg-brand-50 hover:text-brand-600">
