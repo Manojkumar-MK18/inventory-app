@@ -5,6 +5,7 @@ import { usePathname } from "next/navigation";
 import {
   LayoutDashboard, ShoppingCart, Package, Truck,
   ReceiptText, Users, BarChart3, Settings, Wallet, Factory, CalendarCheck, RotateCcw,
+  Scissors, ClipboardCheck, UserCog,
 } from "lucide-react";
 import { Copyright } from "./Brand";
 import { can } from "@/lib/permissions";
@@ -16,14 +17,16 @@ const SECTIONS = [
       { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard, module: "dashboard" },
       { href: "/pos", label: "New Bill", icon: ShoppingCart, module: "pos" },
       { href: "/sales", label: "Sales", icon: ReceiptText, module: "sales" },
-      { href: "/returns", label: "Returns", icon: RotateCcw, module: "returns" },
+      { href: "/returns", label: "Returns & Exchanges", icon: RotateCcw, module: "returns" },
+      { href: "/alterations", label: "Alterations", icon: Scissors, module: "alterations" },
     ],
   },
   {
     title: "Inventory",
     items: [
-      { href: "/products", label: "Products", icon: Package, module: "products" },
+      { href: "/products", label: "Products & Inventory", icon: Package, module: "products" },
       { href: "/purchases", label: "Purchases", icon: Truck, module: "purchases" },
+      { href: "/stock-audit", label: "Stock Audit", icon: ClipboardCheck, module: "stock-audit" },
     ],
   },
   {
@@ -39,6 +42,12 @@ const SECTIONS = [
       { href: "/expenses", label: "Expenses", icon: Wallet, module: "expenses" },
       { href: "/attendance", label: "Attendance", icon: CalendarCheck, module: "attendance" },
       { href: "/reports", label: "Reports", icon: BarChart3, module: "reports" },
+    ],
+  },
+  {
+    title: "Admin",
+    items: [
+      { href: "/employees", label: "Employees & Roles", icon: UserCog, module: "__owner__" }, // owner-only
       { href: "/settings", label: "Settings", icon: Settings, module: "__owner__" }, // owner-only
     ],
   },
@@ -53,22 +62,25 @@ export function Sidebar({ businessName, role, permissions }: { businessName: str
     .filter((s) => s.items.length > 0);
 
   return (
-    <aside className="sticky top-0 flex h-screen w-64 shrink-0 flex-col border-r border-gray-200 bg-white">
-      <div className="flex h-16 items-center gap-3 border-b border-gray-200 px-4">
-        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-brand-500 to-brand-700 text-base font-bold text-white shadow-soft">
+    <aside className="sticky top-0 flex h-screen w-72 shrink-0 flex-col border-r border-gray-200/80 bg-gradient-to-b from-white to-gray-50/60">
+      {/* Shop identity */}
+      <div className="flex h-16 items-center gap-3 px-5">
+        <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-brand-500 to-brand-700 text-lg font-bold text-white shadow-soft">
           {businessName.charAt(0).toUpperCase()}
         </div>
         <div className="min-w-0">
           <p className="truncate text-[15px] font-bold leading-tight text-gray-900">{businessName}</p>
-          <p className="text-xs font-medium capitalize text-gray-400">{role.toLowerCase()}</p>
+          <span className="mt-0.5 inline-block rounded-full bg-brand-50 px-2 py-0.5 text-[11px] font-semibold capitalize text-brand-700">
+            {role.toLowerCase()}
+          </span>
         </div>
       </div>
 
-      <nav className="flex flex-1 flex-col gap-5 overflow-y-auto p-4">
+      <nav className="flex flex-1 flex-col gap-6 overflow-y-auto px-3 py-4">
         {sections.map((section, si) => (
           <div key={si} className="flex flex-col gap-1">
             {section.title && (
-              <p className="px-3 pb-1 text-[10px] font-bold uppercase tracking-widest text-gray-400">{section.title}</p>
+              <p className="px-4 pb-1 text-[11px] font-bold uppercase tracking-[0.12em] text-gray-400">{section.title}</p>
             )}
             {section.items.map(({ href, label, icon: Icon }) => {
               const active = pathname === href || pathname.startsWith(href + "/");
@@ -76,13 +88,17 @@ export function Sidebar({ businessName, role, permissions }: { businessName: str
                 <Link
                   key={href}
                   href={href}
-                  className={`group relative flex items-center gap-3 rounded-xl px-3.5 py-3 text-[15px] font-semibold ${
+                  aria-current={active ? "page" : undefined}
+                  className={`group flex items-center gap-3 rounded-full px-4 py-2.5 text-sm transition-all duration-150 ${
                     active
-                      ? "bg-brand-600 text-white shadow-soft"
-                      : "text-gray-700 hover:bg-brand-50 hover:text-brand-700"
+                      ? "bg-brand-100 font-semibold text-brand-800 shadow-[inset_0_0_0_1px_rgba(79,70,229,0.08)]"
+                      : "font-medium text-gray-600 hover:bg-gray-100 hover:text-gray-900"
                   }`}
                 >
-                  <Icon size={20} className={active ? "text-white" : "text-gray-400 group-hover:text-brand-600"} />
+                  <Icon
+                    size={20}
+                    className={active ? "text-brand-700" : "text-gray-400 group-hover:text-gray-600"}
+                  />
                   {label}
                 </Link>
               );
@@ -91,7 +107,7 @@ export function Sidebar({ businessName, role, permissions }: { businessName: str
         ))}
       </nav>
 
-      <div className="border-t border-gray-100 p-3">
+      <div className="border-t border-gray-100 px-4 py-3">
         <Copyright />
       </div>
     </aside>

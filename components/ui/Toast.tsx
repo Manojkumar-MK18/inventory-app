@@ -20,10 +20,18 @@ type ToastApi = {
 
 const ToastContext = createContext<ToastApi | null>(null);
 
+// Fallback so a missing <ToastProvider> degrades gracefully (logs) instead of
+// throwing — a throw here would break hydration of any component using toasts.
+const NOOP_TOAST: ToastApi = {
+  show: (m) => console.warn("[toast]", m),
+  success: (m) => console.warn("[toast:success]", m),
+  error: (m) => console.warn("[toast:error]", m),
+  info: (m) => console.warn("[toast:info]", m),
+  warning: (m) => console.warn("[toast:warning]", m),
+};
+
 export function useToast(): ToastApi {
-  const ctx = useContext(ToastContext);
-  if (!ctx) throw new Error("useToast must be used inside <ToastProvider>");
-  return ctx;
+  return useContext(ToastContext) ?? NOOP_TOAST;
 }
 
 let seq = 0;

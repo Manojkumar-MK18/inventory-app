@@ -11,7 +11,7 @@ const businessMemberSchema = new Schema(
     userId: { type: Schema.Types.ObjectId, ref: "User", required: true },
     role: {
       type: String,
-      enum: ["OWNER", "MANAGER", "CASHIER"],
+      enum: ["OWNER", "MANAGER", "CASHIER", "SALES", "STOCK", "ACCOUNTANT"],
       required: true,
     },
     // Per-menu access for MANAGER/CASHIER: { dashboard: "view", pos: "edit", … }.

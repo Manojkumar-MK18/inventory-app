@@ -4,7 +4,7 @@
  */
 import { can, type Permissions } from "./permissions";
 
-export type Role = "OWNER" | "MANAGER" | "CASHIER";
+export type Role = "OWNER" | "MANAGER" | "CASHIER" | "SALES" | "STOCK" | "ACCOUNTANT";
 
 export interface Ctx {
   userId: string;

@@ -55,7 +55,7 @@ export function AccountSwitcher({ currentEmail }: { currentEmail: string }) {
   return (
     <div ref={boxRef} className="relative">
       <button type="button" onClick={() => { setOpen((s) => !s); setPwFor(null); setErr(""); }}
-        className="flex items-center gap-2 rounded-xl border border-gray-200 bg-white px-3 py-2 text-sm font-medium text-gray-700 hover:border-brand-200 hover:bg-brand-50">
+        className="flex items-center gap-2 rounded-full border border-gray-200 bg-white px-3.5 py-2 text-sm font-medium text-gray-700 transition-colors hover:border-brand-200 hover:bg-brand-50">
         <UserRound size={16} className="text-gray-400" />
         <span className="hidden max-w-[160px] truncate sm:inline">{currentEmail || "Account"}</span>
         <ChevronDown size={14} className="text-gray-400" />

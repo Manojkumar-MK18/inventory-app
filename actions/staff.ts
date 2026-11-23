@@ -27,7 +27,7 @@ const addStaffSchema = z.object({
   name: z.string().min(2).max(120),
   email: z.string().email().max(254),
   password: z.string().min(8).max(100),
-  role: z.enum(["MANAGER", "CASHIER"]),
+  role: z.enum(["MANAGER", "CASHIER", "SALES", "STOCK", "ACCOUNTANT"]),
   permissions: permSchema,
 });
 

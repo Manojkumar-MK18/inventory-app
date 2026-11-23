@@ -22,11 +22,22 @@ const businessSchema = new Schema(
     lng: { type: Number, default: null },
     logo: { type: String, default: null }, // base64, <= 100KB, no SVG
 
+    // Profile (extra, spec module 14)
+    legalName: { type: String, maxlength: 200, default: "" },
+    email: { type: String, maxlength: 254, default: "" },
+
     // Behaviour flags
     pricesIncludeTax: { type: Boolean, default: true },
     allowNegativeStock: { type: Boolean, default: false },
+    lowStockAlertEnabled: { type: Boolean, default: true },
     // Weekly off day: -1 = none, 0 = Sunday … 6 = Saturday. Excluded from "Leave".
     weeklyOff: { type: Number, default: -1 },
+
+    // Tax / invoice / policy
+    currency: { type: String, maxlength: 8, default: "INR" },
+    fyStartMonth: { type: Number, min: 1, max: 12, default: 4 }, // April
+    returnWindowDays: { type: Number, min: 0, max: 365, default: 7 },
+    discountApprovalLimit: { type: Number, min: 0, max: 100, default: 0 }, // % above which approval needed
 
     invoiceSettings: {
       prefix: { type: String, default: "INV" },
