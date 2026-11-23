@@ -18,6 +18,8 @@ const businessSchema = new Schema(
     phone: { type: String, maxlength: 20, default: "" },
     instagram: { type: String, maxlength: 200, default: "" }, // full profile URL
     mapsUrl: { type: String, maxlength: 400, default: "" }, // Google Maps share link
+    lat: { type: Number, default: null }, // shop location (optional, from map picker)
+    lng: { type: Number, default: null },
     logo: { type: String, default: null }, // base64, <= 100KB, no SVG
 
     // Behaviour flags

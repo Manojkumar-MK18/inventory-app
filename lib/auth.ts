@@ -25,14 +25,18 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
   ...authConfig,
   providers: [
     Credentials({
-      credentials: { email: {}, password: {} },
+      credentials: { loginId: {}, password: {} },
       async authorize(raw) {
         const parsed = loginSchema.safeParse(raw);
         if (!parsed.success) return null;
-        const { email, password } = parsed.data;
+        const { loginId, password } = parsed.data;
 
         await connectDB();
-        const user = await UserModel.findOne({ email });
+        // loginId may be an email or a 10-digit mobile.
+        const isMobile = /^[6-9]\d{9}$/.test(loginId.replace(/\D/g, ""));
+        const user = isMobile
+          ? await UserModel.findOne({ mobile: loginId.replace(/\D/g, "") })
+          : await UserModel.findOne({ email: loginId.toLowerCase().trim() });
         if (!user) return null;
 
         // NOTE: login lockout is intentionally disabled for now. The failedLogins/

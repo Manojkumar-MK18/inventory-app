@@ -10,6 +10,12 @@ const userSchema = new Schema(
     passwordHash: { type: String, required: true },
     name: { type: String, required: true, maxlength: 120 },
 
+    // Mobile is optional for existing users (added later); new signups capture it.
+    // mobileVerifiedAt is stamped once the (dummy) OTP is confirmed.
+    mobile: { type: String, trim: true, maxlength: 15, default: null },
+    mobileVerifiedAt: { type: Date, default: null },
+    termsAcceptedAt: { type: Date, default: null },
+
     // Login lockout (stored in DB — functions keep no memory between requests).
     failedLogins: { type: Number, default: 0 },
     lockedUntil: { type: Date, default: null },

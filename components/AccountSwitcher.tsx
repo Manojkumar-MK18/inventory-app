@@ -43,7 +43,7 @@ export function AccountSwitcher({ currentEmail }: { currentEmail: string }) {
 
   async function doSwitch(email: string, password: string) {
     setBusy(true); setErr("");
-    const res = await signIn("credentials", { email: email.trim().toLowerCase(), password, redirect: false });
+    const res = await signIn("credentials", { loginId: email.trim().toLowerCase(), password, redirect: false });
     setBusy(false);
     if (res?.error) return setErr("Wrong email or password");
     saveEmail(email);
