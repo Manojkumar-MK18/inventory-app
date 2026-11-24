@@ -15,12 +15,24 @@ const purchaseItemSchema = new Schema(
 
 const purchaseSchema = new Schema(
   {
-    supplierName: { type: String, default: "" }, // snapshot; full supplier ledger is later
+    supplierId: { type: Schema.Types.ObjectId, ref: "Supplier", default: null },
+    supplierName: { type: String, default: "" }, // snapshot
     supplierInvoiceNo: { type: String, default: "" },
-    date: { type: Date, default: () => new Date() },
+    date: { type: Date, default: () => new Date() }, // received date (goods in)
+    invoiceDate: { type: Date, default: null }, // supplier's bill date
     items: [purchaseItemSchema],
-    totalCost: { type: Number, default: 0 }, // paise
-    paymentMethod: { type: String, enum: ["PAID", "CREDIT"], default: "PAID" }, // for delete-reversal of dues
+    subtotal: { type: Number, default: 0 }, // paise, Σ(qty×cost)
+    otherCharges: { type: Number, default: 0 }, // paise, freight/landed
+    discountAmount: { type: Number, default: 0 }, // paise
+    totalCost: { type: Number, default: 0 }, // paise, grand total (subtotal + charges − discount)
+    // Payment
+    paymentStatus: { type: String, enum: ["UNPAID", "PARTIAL", "PAID"], default: "PAID" },
+    amountPaid: { type: Number, default: 0 }, // paise
+    dueAmount: { type: Number, default: 0 }, // paise still owed (for delete-reversal)
+    paymentMode: { type: String, enum: ["CASH", "UPI", "BANK", "CHEQUE"], default: "CASH" },
+    referenceNo: { type: String, default: "" },
+    notes: { type: String, default: "" },
+    paymentMethod: { type: String, enum: ["PAID", "CREDIT"], default: "PAID" }, // legacy, kept for old rows
     createdBy: { type: Schema.Types.ObjectId, ref: "User" },
   },
   { timestamps: true }

@@ -24,8 +24,16 @@ export interface PurchaseLine {
 export interface CreatePurchaseInput {
   supplierName?: string;
   supplierInvoiceNo?: string;
-  paymentMethod?: "PAID" | "CREDIT";
-  date?: Date; // purchase date (defaults to now)
+  date?: Date; // received date (defaults to now)
+  invoiceDate?: Date | null;
+  otherCharges?: number; // paise
+  discountAmount?: number; // paise
+  paymentStatus?: "UNPAID" | "PARTIAL" | "PAID";
+  amountPaid?: number; // paise
+  paymentMode?: "CASH" | "UPI" | "BANK" | "CHEQUE";
+  referenceNo?: string;
+  notes?: string;
+  createdBy?: string;
   items: PurchaseLine[];
 }
 
@@ -87,75 +95,65 @@ export function purchaseRepo(ctx: Ctx) {
             items.push({ productId: p._id, name: line.variantLabel ? `${p.name} (${line.variantLabel})` : p.name, variantLabel: line.variantLabel ?? "", qty: line.qty, cost: line.cost, taxRate: p.taxRate });
           }
 
-          // Same supplier + same invoice number -> MERGE into that existing invoice
-          // (add these items, add to its total) instead of making a second row.
-          // Different invoice (or blank) -> a new row. Stock/cost above already applied.
-          const supNameTrim = (input.supplierName ?? "").trim();
-          const invNoTrim = (input.supplierInvoiceNo ?? "").trim();
-          let existing: any = null;
-          if (supNameTrim && invNoTrim) {
-            const esc = supNameTrim.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-            existing = await PurchaseModel.findOne({
-              businessId: bId,
-              supplierInvoiceNo: invNoTrim,
-              supplierName: { $regex: `^${esc}$`, $options: "i" },
-            }).session(session);
-          }
+          // Grand total = goods + freight − discount.
+          const subtotal = totalCost;
+          const other = input.otherCharges ?? 0;
+          const disc = input.discountAmount ?? 0;
+          const grand = Math.max(0, subtotal + other - disc);
 
-          if (existing) {
-            existing.items.push(...items);
-            existing.totalCost += totalCost;
-            await existing.save({ session });
-            saved = existing;
-          } else {
-            const created = await PurchaseModel.create(
-              [
-                {
-                  businessId: bId,
-                  supplierName: input.supplierName ?? "",
-                  supplierInvoiceNo: input.supplierInvoiceNo ?? "",
-                  date: when,
-                  items,
-                  totalCost,
-                  paymentMethod: input.paymentMethod ?? "PAID",
-                  createdBy: ctx.userId,
-                },
-              ],
-              { session }
-            );
-            saved = created[0];
-          }
+          // How much is paid now vs still owed, from the chosen status.
+          const status = input.paymentStatus ?? "PAID";
+          const paid = status === "PAID" ? grand : status === "PARTIAL" ? Math.min(grand, input.amountPaid ?? 0) : 0;
+          const due = Math.max(0, grand - paid);
 
-          // Link the supplier for EVERY named purchase so they appear under Suppliers.
-          const method = input.paymentMethod ?? "PAID";
-          const name = (input.supplierName ?? "").trim();
-          if (method === "CREDIT" && !name) throw new Error("A credit purchase needs a supplier name");
+          const supName = (input.supplierName ?? "").trim();
+          if (due > 0 && !supName) throw new Error("An unpaid / partial purchase needs a supplier name");
 
-          if (name) {
-            // Match an existing supplier case-insensitively (and trimmed) so "Zudio",
-            // "zudio" and "Zudio " all reuse the same record instead of duplicating.
-            const escaped = name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-            let supplier = await SupplierModel.findOne({
-              businessId: bId,
-              name: { $regex: `^${escaped}$`, $options: "i" },
-            }).session(session);
+          // Link or create the supplier, and add what we still owe them.
+          let supplierId: mongoose.Types.ObjectId | null = null;
+          if (supName) {
+            const escaped = supName.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+            let supplier = await SupplierModel.findOne({ businessId: bId, name: { $regex: `^${escaped}$`, $options: "i" } }).session(session);
             if (!supplier) {
-              const createdS = await SupplierModel.create([{ businessId: bId, name }], { session });
-              supplier = createdS[0];
+              const c = await SupplierModel.create([{ businessId: bId, name: supName }], { session });
+              supplier = c[0];
             }
-            // Credit adds to what you owe them; paid leaves the balance unchanged.
-            if (method === "CREDIT") {
-              await SupplierModel.updateOne(
-                { businessId: bId, _id: supplier._id },
-                { $inc: { balanceDue: totalCost } },
-                { session }
-              );
+            supplierId = supplier._id;
+            if (due > 0) {
+              await SupplierModel.updateOne({ businessId: bId, _id: supplier._id }, { $inc: { balanceDue: due } }, { session });
             }
           }
 
-          if (method !== "CREDIT") {
+          const created = await PurchaseModel.create(
+            [{
+              businessId: bId,
+              supplierId,
+              supplierName: supName,
+              supplierInvoiceNo: input.supplierInvoiceNo ?? "",
+              date: when,
+              invoiceDate: input.invoiceDate ?? null,
+              items,
+              subtotal,
+              otherCharges: other,
+              discountAmount: disc,
+              totalCost: grand,
+              paymentStatus: status,
+              amountPaid: paid,
+              dueAmount: due,
+              paymentMode: input.paymentMode ?? "CASH",
+              referenceNo: input.referenceNo ?? "",
+              notes: input.notes ?? "",
+              paymentMethod: due > 0 ? "CREDIT" : "PAID",
+              createdBy: input.createdBy ?? ctx.userId,
+            }],
+            { session }
+          );
+          saved = created[0];
+
+          // Record the payment made now (if any) against the supplier ledger.
+          if (paid > 0) {
             await PaymentModel.create(
-              [{ businessId: bId, refType: "PURCHASE", refId: saved._id, method: "CASH", amount: totalCost }],
+              [{ businessId: bId, refType: "PURCHASE", refId: saved._id, method: input.paymentMode ?? "CASH", amount: paid }],
               { session }
             );
           }

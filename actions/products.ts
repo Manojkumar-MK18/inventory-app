@@ -11,7 +11,8 @@ import { toPaise } from "@/lib/money";
 import { makeEan13 } from "@/lib/barcode";
 import { ProductModel } from "@/models/Product";
 import { CategoryModel } from "@/models/Category";
-import { productFormSchema, productUpdateSchema, stockAdjustSchema, variantStockAdjustSchema, quickProductSchema, setSellableSchema, markReadySchema } from "@/schemas/product";
+import { BrandModel } from "@/models/Brand";
+import { productFormSchema, productUpdateSchema, stockAdjustSchema, quickProductSchema, setSellableSchema, markReadySchema } from "@/schemas/product";
 
 /** Upsert a category so it shows up in the dropdown next time. */
 async function ensureCategory(businessId: mongoose.Types.ObjectId, name: string) {
@@ -22,6 +23,26 @@ async function ensureCategory(businessId: mongoose.Types.ObjectId, name: string)
     { $setOnInsert: { businessId, name: clean } },
     { upsert: true }
   );
+}
+
+/** Upsert a brand so it shows up in the dropdown next time. */
+async function ensureBrand(businessId: mongoose.Types.ObjectId, name: string) {
+  const clean = name.trim();
+  if (!clean) return;
+  await BrandModel.updateOne(
+    { businessId, name: clean },
+    { $setOnInsert: { businessId, name: clean } },
+    { upsert: true }
+  );
+}
+
+/** Brand names for the dropdown. */
+export async function listBrands(): Promise<string[]> {
+  const ctx = await getContext();
+  await connectDB();
+  const bId = new mongoose.Types.ObjectId(ctx.businessId);
+  const rows = await BrandModel.find({ businessId: bId }).sort({ name: 1 }).lean<{ name: string }[]>();
+  return rows.map((r) => r.name);
 }
 
 export type ActionResult = { ok: true } | { ok: false; error: string };
@@ -43,7 +64,17 @@ export interface ProductDTO {
   discount: number; // paise if discountUnit "₹", else percent
   discountUnit: "₹" | "%";
   categoryName: string;
-  variants: { label: string; barcode: string; stock: number; minStock: number; price: number | null }[];
+  brandName: string;
+  department: string;
+  description: string;
+  fabric: string;
+  imageUrl: string;
+  mrp: number | null; // paise
+  variants: {
+    label: string; size: string; color: string; fit: string;
+    barcode: string; stock: number; minStock: number;
+    price: number | null; mrp: number | null; costPrice: number | null; locationCode: string;
+  }[];
   sellable: boolean;
 }
 
@@ -68,25 +99,56 @@ export async function listProducts(opts?: { sellableOnly?: boolean }): Promise<P
     discount: p.discount ?? 0,
     discountUnit: (p.discountUnit as "₹" | "%") ?? "₹",
     categoryName: p.categoryName ?? "",
+    brandName: p.brandName ?? "",
+    department: p.department ?? "",
+    description: p.description ?? "",
+    fabric: p.fabric ?? "",
+    imageUrl: p.imageUrl ?? "",
+    mrp: p.mrp ?? null,
     variants: (p.variants ?? []).map((v: any) => ({
       label: v.label,
+      size: v.size ?? "",
+      color: v.color ?? "",
+      fit: v.fit ?? "",
       barcode: v.barcode ?? "",
       stock: v.stock ?? 0,
       minStock: v.minStock ?? 0,
       price: v.price ?? null,
+      mrp: v.mrp ?? null,
+      costPrice: v.costPrice ?? null,
+      locationCode: v.locationCode ?? "",
     })),
     sellable: p.sellable !== false,
   }));
 }
 
+type VariantInput = {
+  label?: string; size?: string; color?: string; fit?: string;
+  barcode?: string; openingStock: number; minStock?: number;
+  priceRupees?: number; mrpRupees?: number; costRupees?: number; locationCode?: string;
+};
+
+/** Combined display key ("Black / M"), computed from size/colour/fit when not given. */
+function computeLabel(v: VariantInput): string {
+  if (v.label && v.label.trim()) return v.label.trim();
+  const parts = [v.color, v.size, v.fit].map((x) => (x ?? "").trim()).filter(Boolean);
+  return parts.join(" / ") || "—";
+}
+
 /** Build variant subdocs + total stock from the form input. */
-function buildVariants(input: { label: string; barcode?: string; openingStock: number; minStock?: number; priceRupees?: number }[]) {
+function buildVariants(input: VariantInput[]) {
   const variants = input.map((v) => ({
-    label: v.label.trim(),
+    label: computeLabel(v),
+    size: (v.size ?? "").trim(),
+    color: (v.color ?? "").trim(),
+    fit: (v.fit ?? "").trim(),
     barcode: v.barcode || "",
     stock: v.openingStock,
     minStock: v.minStock ?? 0,
-    price: v.priceRupees != null && v.priceRupees !== undefined ? toPaise(v.priceRupees) : null,
+    price: v.priceRupees != null ? toPaise(v.priceRupees) : null,
+    mrp: v.mrpRupees != null ? toPaise(v.mrpRupees) : null,
+    costPrice: v.costRupees != null ? toPaise(v.costRupees) : null,
+    locationCode: (v.locationCode ?? "").trim(),
   }));
   const totalStock = variants.reduce((a, v) => a + v.stock, 0);
   return { variants, totalStock };
@@ -117,6 +179,13 @@ export async function createProduct(raw: unknown): Promise<ActionResult> {
       sku: d.sku,
       barcode: d.barcode || undefined,
       hsn: d.hsn || undefined,
+      categoryName: (d.categoryName || "").trim(),
+      brandName: (d.brandName || "").trim(),
+      department: (d.department || "").trim(),
+      description: (d.description || "").trim(),
+      fabric: (d.fabric || "").trim(),
+      imageUrl: d.imageUrl || "",
+      mrp: d.mrpRupees != null ? toPaise(d.mrpRupees) : null,
       unit: d.unit || "pcs",
       salePrice: toPaise(d.salePriceRupees),
       taxRate: d.taxRate,
@@ -124,11 +193,11 @@ export async function createProduct(raw: unknown): Promise<ActionResult> {
       minStock: d.minStock,
       discount: discountToStored(d.discountValue, d.discountUnit),
       discountUnit: d.discountUnit,
-      categoryName: (d.categoryName || "").trim(),
       variants,
       isActive: true,
     });
     await ensureCategory(bId, d.categoryName || "");
+    await ensureBrand(bId, d.brandName || "");
 
     // Record opening stock as movements (per variant if any) — the ledger is the source of truth.
     if (hasVariants) {
@@ -177,18 +246,37 @@ export async function updateProduct(raw: unknown): Promise<ActionResult> {
       discountUnit: d.discountUnit,
       categoryName: (d.categoryName || "").trim(),
     };
+    // Only overwrite the new master fields when the caller actually sent them
+    // (the old edit form doesn't, so they stay intact).
+    if (d.brandName !== undefined) set.brandName = (d.brandName || "").trim();
+    if (d.department !== undefined) set.department = (d.department || "").trim();
+    if (d.description !== undefined) set.description = (d.description || "").trim();
+    if (d.fabric !== undefined) set.fabric = (d.fabric || "").trim();
+    if (d.imageUrl !== undefined) set.imageUrl = d.imageUrl || "";
+    if (d.mrpRupees !== undefined) set.mrp = d.mrpRupees != null ? toPaise(d.mrpRupees) : null;
 
-    // Reconcile variants by label: keep existing stock, new labels get their opening stock.
+    // Reconcile variants by label: keep existing stock + preserve size/colour/mrp/cost.
     const hasVariants = (d.variants?.length ?? 0) > 0;
     if (hasVariants) {
-      const stockByLabel = new Map((existing.variants ?? []).map((v: any) => [v.label, v.stock]));
-      const variants = d.variants!.map((v) => ({
-        label: v.label.trim(),
-        barcode: v.barcode || "",
-        stock: stockByLabel.get(v.label.trim()) ?? v.openingStock,
-        minStock: v.minStock ?? 0,
-        price: v.priceRupees != null ? toPaise(v.priceRupees) : null,
-      }));
+      const exByLabel = new Map((existing.variants ?? []).map((v: any) => [v.label, v]));
+      const variants = d.variants!.map((v) => {
+        const label = computeLabel(v);
+        // Match the existing row by its original label (so renaming size/colour keeps stock).
+        const ex: any = exByLabel.get(v.origLabel || label) ?? exByLabel.get(label);
+        return {
+          label,
+          size: (v.size ?? ex?.size ?? "").trim(),
+          color: (v.color ?? ex?.color ?? "").trim(),
+          fit: (v.fit ?? ex?.fit ?? "").trim(),
+          barcode: v.barcode || ex?.barcode || "",
+          stock: ex?.stock ?? v.openingStock,
+          minStock: v.minStock ?? ex?.minStock ?? 0,
+          price: v.priceRupees != null ? toPaise(v.priceRupees) : ex?.price ?? null,
+          mrp: v.mrpRupees != null ? toPaise(v.mrpRupees) : ex?.mrp ?? null,
+          costPrice: v.costRupees != null ? toPaise(v.costRupees) : ex?.costPrice ?? null,
+          locationCode: (v.locationCode ?? ex?.locationCode ?? "").trim(),
+        };
+      });
       set.variants = variants;
       set.currentStock = variants.reduce((a, v) => a + v.stock, 0);
     } else {
@@ -198,6 +286,7 @@ export async function updateProduct(raw: unknown): Promise<ActionResult> {
     const updated = await productRepo(ctx).update(d.id, set);
     if (!updated) return { ok: false, error: "Product not found" };
     await ensureCategory(bId, d.categoryName || "");
+    if (d.brandName) await ensureBrand(bId, d.brandName);
   } catch (e: any) {
     if (e?.code === 11000) return { ok: false, error: "A product with this SKU already exists" };
     return { ok: false, error: "Could not update the product" };
@@ -208,80 +297,62 @@ export async function updateProduct(raw: unknown): Promise<ActionResult> {
   return { ok: true };
 }
 
-/** Set stock to an exact count; records the difference as an ADJUSTMENT movement. */
+/**
+ * Adjust stock by a signed movement with a MANDATORY reason. Works on a whole
+ * product or a single variant (pass `label`). Type: Increase / Decrease / Damage / Loss.
+ */
 export async function adjustStock(raw: unknown): Promise<ActionResult> {
   const ctx = await getContext();
   requirePerm(ctx, "products");
 
   const parsed = stockAdjustSchema.safeParse(raw);
-  if (!parsed.success) return { ok: false, error: "Invalid stock value" };
-  const { id, newCount } = parsed.data;
+  if (!parsed.success) return { ok: false, error: parsed.error.issues[0]?.message ?? "Please check the details" };
+  const { id, label, adjustmentType, quantity, reason, referenceNo } = parsed.data;
+
+  const delta = (adjustmentType === "INCREASE" ? 1 : -1) * quantity;
+  const movementType = adjustmentType === "DAMAGE" ? "DAMAGE" : "ADJUSTMENT";
+  const isVariant = !!(label && label.trim());
 
   await connectDB();
   const bId = new mongoose.Types.ObjectId(ctx.businessId);
+  const userId = new mongoose.Types.ObjectId(ctx.userId);
   const product = await ProductModel.findOne({ businessId: bId, _id: id });
   if (!product) return { ok: false, error: "Product not found" };
 
-  const delta = newCount - product.currentStock;
-  if (delta === 0) return { ok: true };
-
+  let failed = "";
   const session = await mongoose.startSession();
   try {
     await session.withTransaction(async () => {
-      await ProductModel.updateOne(
-        { businessId: bId, _id: id },
-        { $set: { currentStock: newCount } },
-        { session }
-      );
+      if (isVariant) {
+        const variant = (product.variants ?? []).find((v: any) => v.label === label);
+        if (!variant) { failed = "Variant not found"; return; }
+        if (variant.stock + delta < 0) { failed = `Only ${variant.stock} in stock for ${label}`; return; }
+        await ProductModel.updateOne(
+          { businessId: bId, _id: id, "variants.label": label },
+          { $inc: { "variants.$.stock": delta, currentStock: delta } },
+          { session }
+        );
+      } else {
+        if (product.currentStock + delta < 0) { failed = `Only ${product.currentStock} in stock`; return; }
+        await ProductModel.updateOne(
+          { businessId: bId, _id: id },
+          { $inc: { currentStock: delta } },
+          { session }
+        );
+      }
       await StockMovementModel.create(
-        [{ businessId: bId, productId: product._id, type: "ADJUSTMENT", qty: delta, refType: "ADJUSTMENT" }],
+        [{
+          businessId: bId, productId: product._id, variantLabel: isVariant ? label : "",
+          type: movementType, qty: delta, refType: movementType,
+          reason, referenceNo: referenceNo || "", createdBy: userId,
+        }],
         { session }
       );
     });
   } finally {
     await session.endSession();
   }
-
-  revalidatePath("/products");
-  revalidatePath("/pos");
-  return { ok: true };
-}
-
-/** Set one variant's stock to an exact count; records the difference as an ADJUSTMENT. */
-export async function adjustVariantStock(raw: unknown): Promise<ActionResult> {
-  const ctx = await getContext();
-  requirePerm(ctx, "products");
-
-  const parsed = variantStockAdjustSchema.safeParse(raw);
-  if (!parsed.success) return { ok: false, error: "Invalid stock value" };
-  const { id, label, newCount } = parsed.data;
-
-  await connectDB();
-  const bId = new mongoose.Types.ObjectId(ctx.businessId);
-  const product = await ProductModel.findOne({ businessId: bId, _id: id });
-  if (!product) return { ok: false, error: "Product not found" };
-  const variant = (product.variants ?? []).find((v: any) => v.label === label);
-  if (!variant) return { ok: false, error: "Size not found" };
-
-  const delta = newCount - variant.stock;
-  if (delta === 0) return { ok: true };
-
-  const session = await mongoose.startSession();
-  try {
-    await session.withTransaction(async () => {
-      await ProductModel.updateOne(
-        { businessId: bId, _id: id, "variants.label": label },
-        { $set: { "variants.$.stock": newCount }, $inc: { currentStock: delta } },
-        { session }
-      );
-      await StockMovementModel.create(
-        [{ businessId: bId, productId: product._id, variantLabel: label, type: "ADJUSTMENT", qty: delta, refType: "ADJUSTMENT" }],
-        { session }
-      );
-    });
-  } finally {
-    await session.endSession();
-  }
+  if (failed) return { ok: false, error: failed };
 
   revalidatePath("/products");
   revalidatePath("/pos");
@@ -327,7 +398,11 @@ export async function quickCreateProduct(raw: unknown): Promise<{ ok: true; prod
         id: p._id.toString(), name: p.name, sku: p.sku, barcode: null, hsn: null, unit: p.unit,
         salePrice: 0, costPrice: 0, taxRate: 0, currentStock: 0, damagedStock: 0, minStock: 0,
         discount: 0, discountUnit: "₹", categoryName,
-        variants: variants.map((v) => ({ label: v.label, barcode: "", stock: 0, minStock: 0, price: null })),
+        brandName: "", department: "", description: "", fabric: "", imageUrl: "", mrp: null,
+        variants: variants.map((v: any) => ({
+          label: v.label, size: v.size ?? "", color: v.color ?? "", fit: v.fit ?? "",
+          barcode: "", stock: 0, minStock: 0, price: null, mrp: null, costPrice: null, locationCode: "",
+        })),
         sellable: false,
       },
     };
@@ -343,7 +418,7 @@ export async function markReady(raw: unknown): Promise<ActionResult> {
   requirePerm(ctx, "products");
   const parsed = markReadySchema.safeParse(raw);
   if (!parsed.success) return { ok: false, error: "Enter a valid selling price" };
-  const { id, salePriceRupees, taxRate, variantPrices } = parsed.data;
+  const { id, salePriceRupees, mrpRupees, taxRate, variantPrices } = parsed.data;
 
   await connectDB();
   const bId = new mongoose.Types.ObjectId(ctx.businessId);
@@ -352,19 +427,25 @@ export async function markReady(raw: unknown): Promise<ActionResult> {
 
   const hasVariants = (product.variants ?? []).length > 0;
   if (hasVariants) {
-    // Each size has its own selling price.
-    const priceByLabel = new Map((variantPrices ?? []).map((v) => [v.label, toPaise(v.priceRupees)]));
+    // Each size has its own selling price (+ optional MRP).
+    const byLabel = new Map((variantPrices ?? []).map((v) => [v.label, v]));
     for (const v of product.variants) {
-      if (!priceByLabel.has(v.label) || priceByLabel.get(v.label)! <= 0) {
+      const row = byLabel.get(v.label);
+      if (!row || toPaise(row.priceRupees) <= 0) {
         return { ok: false, error: `Enter a price for size ${v.label}` };
       }
     }
-    product.variants.forEach((v: any) => { v.price = priceByLabel.get(v.label)!; });
+    product.variants.forEach((v: any) => {
+      const row = byLabel.get(v.label)!;
+      v.price = toPaise(row.priceRupees);
+      if (row.mrpRupees != null) v.mrp = toPaise(row.mrpRupees);
+    });
     // Product-level salePrice = lowest size price (fallback/display only).
     product.salePrice = Math.min(...product.variants.map((v: any) => v.price));
   } else {
     if (salePriceRupees <= 0) return { ok: false, error: "Enter a valid selling price" };
     product.salePrice = toPaise(salePriceRupees);
+    if (mrpRupees != null) product.mrp = toPaise(mrpRupees);
   }
   product.taxRate = taxRate;
   product.sellable = true;

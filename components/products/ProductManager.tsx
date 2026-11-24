@@ -2,8 +2,10 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { Plus, Pencil, Package, Search, Check, EyeOff, Barcode, Trash2 } from "lucide-react";
-import { createProduct, updateProduct, adjustStock, adjustVariantStock, setSellable, markReady, deleteProduct, type ProductDTO } from "@/actions/products";
+import { Plus, Pencil, Package, Search, Check, Barcode, Trash2 } from "lucide-react";
+import { createProduct, updateProduct, adjustStock, setSellable, markReady, deleteProduct, type ProductDTO } from "@/actions/products";
+import { AddProductWizard } from "./AddProductWizard";
+import { EditProductModal } from "./EditProductModal";
 import { formatINR, toRupees } from "@/lib/money";
 import { UNITS, GST_RATES } from "@/lib/units";
 import { Field, InfoTip } from "@/components/InfoTip";
@@ -32,9 +34,10 @@ function isLow(p: ProductDTO) {
   return p.variants.length > 0 ? lowSizes(p).length > 0 : p.currentStock <= p.minStock;
 }
 
-export function ProductManager({ initial, categories, shopName, canEdit = true }: { initial: ProductDTO[]; categories: string[]; shopName: string; canEdit?: boolean }) {
+export function ProductManager({ initial, categories, brands = [], shopName, canEdit = true }: { initial: ProductDTO[]; categories: string[]; brands?: string[]; shopName: string; canEdit?: boolean }) {
   const router = useRouter();
   const [mode, setMode] = useState<Mode>({ kind: "closed" });
+  const [showWizard, setShowWizard] = useState(false);
   const [stockFor, setStockFor] = useState<ProductDTO | null>(null);
   const [readyFor, setReadyFor] = useState<ProductDTO | null>(null);
   const [barcodeFor, setBarcodeFor] = useState<ProductDTO | null>(null);
@@ -51,49 +54,50 @@ export function ProductManager({ initial, categories, shopName, canEdit = true }
 
   return (
     <div className="flex flex-col gap-4">
-      <div className="flex items-center justify-between gap-3">
-        <div className="relative flex-1 max-w-sm">
-          <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div className="relative max-w-sm flex-1">
+          <Search size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400" />
           <input
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             placeholder="Search products…"
-            className="w-full rounded-lg border border-gray-300 py-2 pl-9 pr-3 text-sm"
+            className="w-full rounded-full border border-gray-300 bg-white py-2.5 pl-10 pr-4 text-sm outline-none transition focus:border-brand-500 focus:ring-2 focus:ring-brand-100"
           />
         </div>
         {categories.length > 0 && (
-          <select value={cat} onChange={(e) => setCat(e.target.value)} className="rounded-lg border border-gray-300 px-3 py-2 text-sm">
+          <select value={cat} onChange={(e) => setCat(e.target.value)} className="rounded-full border border-gray-300 bg-white px-4 py-2.5 text-sm outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-100">
             <option value="">All categories</option>
             {categories.map((c) => <option key={c} value={c}>{c}</option>)}
           </select>
         )}
         {canEdit && (
           <button
-            onClick={() => setMode({ kind: "add" })}
-            className="flex items-center gap-1.5 rounded-xl bg-gray-900 px-4 py-2 text-sm font-medium text-white"
+            onClick={() => setShowWizard(true)}
+            className="flex items-center gap-1.5 rounded-full bg-brand-600 px-4 py-2.5 text-sm font-semibold text-white shadow-card transition hover:bg-brand-700 hover:shadow-soft"
           >
             <Plus size={16} /> Add product
           </button>
         )}
       </div>
 
-      <div className="overflow-hidden rounded-2xl border border-gray-200">
+      <div className="overflow-hidden rounded-3xl border border-gray-200 bg-white shadow-card">
         <table className="w-full text-sm">
-          <thead className="border-b border-gray-200 bg-gray-50 text-left text-[11px] font-semibold uppercase tracking-wider text-gray-500">
+          <thead className="border-b border-gray-200 bg-gray-50/80 text-left text-[11px] font-semibold uppercase tracking-wider text-gray-500">
             <tr>
-              <th className="px-4 py-3">Product</th>
-              <th className="px-4 py-3">SKU</th>
-              <th className="px-4 py-3">Category</th>
-              <th className="px-4 py-3 text-right">Price</th>
-              <th className="px-4 py-3 text-center">GST</th>
-              <th className="px-4 py-3 text-right">Stock</th>
-              <th className="px-4 py-3 text-right">Actions</th>
+              <th className="px-4 py-3.5">Product</th>
+              <th className="px-4 py-3.5">SKU</th>
+              <th className="px-4 py-3.5">Category</th>
+              <th className="px-4 py-3.5 text-center">Dept</th>
+              <th className="px-4 py-3.5 text-right">Price</th>
+              <th className="px-4 py-3.5 text-center">GST</th>
+              <th className="px-4 py-3.5 text-right">Stock</th>
+              <th className="px-4 py-3.5 text-right">Actions</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-100">
             {filtered.length === 0 && (
               <tr>
-                <td colSpan={7} className="px-4 py-10 text-center text-gray-400">
+                <td colSpan={8} className="px-4 py-12 text-center text-gray-400">
                   {initial.length === 0 ? "No products yet. Add your first product to start billing." : "No matches."}
                 </td>
               </tr>
@@ -102,28 +106,50 @@ export function ProductManager({ initial, categories, shopName, canEdit = true }
               const low = isLow(p);
               const lows = lowSizes(p);
               return (
-                <tr key={p.id} className="hover:bg-gray-50">
+                <tr key={p.id} className="hover:bg-gray-50/60">
                   <td className="px-4 py-3 align-top">
-                    <div className="font-medium">{p.name}</div>
-                    {(p.variants.length > 0 || !p.sellable) && (
-                      <div className="mt-1 flex flex-wrap items-center gap-1">
-                        {p.variants.length > 0 && (
-                          <span className="rounded bg-indigo-50 px-1.5 py-0.5 text-[10px] font-medium text-indigo-600">
-                            {p.variants.length} {p.variants.length === 1 ? "size" : "sizes"}
-                          </span>
-                        )}
-                        {!p.sellable && (
-                          <span className="whitespace-nowrap rounded bg-amber-50 px-1.5 py-0.5 text-[10px] font-medium text-amber-700">
-                            Draft · not for sale
-                          </span>
+                    <div className="flex items-start gap-3">
+                      {p.imageUrl ? (
+                        <img src={p.imageUrl} alt="" className="h-11 w-11 shrink-0 rounded-lg border border-gray-200 object-cover" />
+                      ) : (
+                        <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg bg-gray-100 text-gray-300">
+                          <Package size={18} />
+                        </div>
+                      )}
+                      <div className="min-w-0">
+                        <div className="font-semibold text-gray-900">{p.name}</div>
+                        {p.brandName && <div className="text-xs text-gray-400">{p.brandName}</div>}
+                        {(p.variants.length > 0 || !p.sellable) && (
+                          <div className="mt-1 flex flex-wrap items-center gap-1">
+                            {p.variants.length > 0 && (
+                              <span className="rounded-full bg-brand-50 px-2 py-0.5 text-[10px] font-semibold text-brand-700">
+                                {p.variants.length} {p.variants.length === 1 ? "variant" : "variants"}
+                              </span>
+                            )}
+                            {!p.sellable && (
+                              <span className="whitespace-nowrap rounded-full bg-amber-50 px-2 py-0.5 text-[10px] font-semibold text-amber-700">
+                                Draft
+                              </span>
+                            )}
+                          </div>
                         )}
                       </div>
-                    )}
+                    </div>
                   </td>
-                  <td className="px-4 py-3 align-top text-gray-500">{p.sku}</td>
+                  <td className="px-4 py-3 align-top font-mono text-xs text-gray-500">{p.sku}</td>
                   <td className="px-4 py-3 align-top text-gray-500">{p.categoryName || "—"}</td>
-                  <td className="px-4 py-3 align-top text-right">{priceLabel(p)}</td>
-                  <td className="px-4 py-3 align-top text-center">{p.taxRate}%</td>
+                  <td className="px-4 py-3 align-top text-center">
+                    {p.department ? (
+                      <span className="rounded-full bg-gray-100 px-2.5 py-0.5 text-[11px] font-semibold text-gray-600">{p.department}</span>
+                    ) : <span className="text-gray-300">—</span>}
+                  </td>
+                  <td className="px-4 py-3 align-top text-right">
+                    {p.mrp != null && p.mrp > p.salePrice && (
+                      <div className="text-[11px] text-gray-400 line-through">₹{Math.round(p.mrp / 100).toLocaleString("en-IN")}</div>
+                    )}
+                    <div className="font-semibold text-gray-900">{priceLabel(p)}</div>
+                  </td>
+                  <td className="px-4 py-3 align-top text-center text-gray-500">{p.taxRate}%</td>
                   <td className="px-4 py-3 align-top text-right">
                     <div className="flex flex-col items-end gap-1">
                       <span className={`inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-xs font-medium ${low ? "bg-red-50 text-red-600" : "bg-green-50 text-green-700"}`}>
@@ -152,37 +178,29 @@ export function ProductManager({ initial, categories, shopName, canEdit = true }
                     </div>
                   </td>
                   <td className="px-4 py-3 align-top">
-                    <div className="flex justify-end gap-2">
+                    <div className="flex items-center justify-end gap-1.5">
                       {canEdit && (p.sellable ? (
                         <button onClick={async () => { await setSellable({ id: p.id, sellable: false }); router.refresh(); }}
-                          className="flex items-center gap-1 rounded-md border px-2.5 py-1 text-xs text-gray-500 hover:bg-gray-100" title="Stop selling (make draft)">
-                          <EyeOff size={13} /> Draft
+                          className="rounded-full px-3 py-1.5 text-xs font-semibold text-gray-500 transition hover:bg-gray-100" title="Stop selling (make draft)">
+                          Draft
                         </button>
                       ) : (
                         <button onClick={() => setReadyFor(p)}
-                          className="flex items-center gap-1 rounded-md bg-green-600 px-2.5 py-1 text-xs font-medium text-white hover:bg-green-700" title="Set selling price and make ready to sell">
-                          <Check size={13} /> Ready to sell
+                          className="flex items-center gap-1 rounded-full bg-emerald-600 px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-emerald-700" title="Set selling price and make ready to sell">
+                          <Check size={13} /> Ready
                         </button>
                       ))}
                       {canEdit && (
-                        <button onClick={() => setStockFor(p)} className="flex items-center gap-1 rounded-md border px-2.5 py-1 text-xs hover:bg-gray-100">
-                          <Package size={13} /> Stock
-                        </button>
+                        <IconBtn title="Adjust stock" onClick={() => setStockFor(p)}><Package size={16} /></IconBtn>
                       )}
-                      <button onClick={() => setBarcodeFor(p)} className="flex items-center gap-1 rounded-md border px-2.5 py-1 text-xs hover:bg-gray-100" title="View, download or print barcodes">
-                        <Barcode size={13} /> Barcode
-                      </button>
+                      <IconBtn title="Barcodes — view / print labels" onClick={() => setBarcodeFor(p)}><Barcode size={16} /></IconBtn>
                       {canEdit ? (
                         <>
-                          <button onClick={() => setMode({ kind: "edit", product: p })} className="flex items-center gap-1 rounded-md border px-2.5 py-1 text-xs hover:bg-gray-100">
-                            <Pencil size={13} /> Edit
-                          </button>
-                          <button onClick={() => setDeleteFor(p)} className="flex items-center gap-1 rounded-md border px-2.5 py-1 text-xs text-red-600 hover:bg-red-50" title="Delete this product">
-                            <Trash2 size={13} /> Delete
-                          </button>
+                          <IconBtn title="Edit product" onClick={() => setMode({ kind: "edit", product: p })}><Pencil size={16} /></IconBtn>
+                          <IconBtn title="Delete product" danger onClick={() => setDeleteFor(p)}><Trash2 size={16} /></IconBtn>
                         </>
                       ) : (
-                        <span className="rounded-md bg-gray-100 px-2.5 py-1 text-xs text-gray-400">View only</span>
+                        <span className="rounded-full bg-gray-100 px-2.5 py-1 text-xs text-gray-400">View only</span>
                       )}
                     </div>
                   </td>
@@ -193,10 +211,20 @@ export function ProductManager({ initial, categories, shopName, canEdit = true }
         </table>
       </div>
 
-      {mode.kind !== "closed" && (
-        <ProductForm
-          product={mode.kind === "edit" ? mode.product : null}
+      {showWizard && (
+        <AddProductWizard
           categories={categories}
+          brands={brands}
+          onClose={() => setShowWizard(false)}
+          onSaved={() => { setShowWizard(false); router.refresh(); }}
+        />
+      )}
+
+      {mode.kind === "edit" && (
+        <EditProductModal
+          product={mode.product}
+          categories={categories}
+          brands={brands}
           onClose={() => setMode({ kind: "closed" })}
           onSaved={() => { setMode({ kind: "closed" }); router.refresh(); }}
         />
@@ -230,6 +258,16 @@ export function ProductManager({ initial, categories, shopName, canEdit = true }
         />
       )}
     </div>
+  );
+}
+
+/** Compact circular icon action button used in the product list. */
+function IconBtn({ children, title, onClick, danger }: { children: React.ReactNode; title: string; onClick: () => void; danger?: boolean }) {
+  return (
+    <button onClick={onClick} title={title}
+      className={`flex h-8 w-8 items-center justify-center rounded-full text-gray-500 transition ${danger ? "hover:bg-red-50 hover:text-red-600" : "hover:bg-brand-50 hover:text-brand-600"}`}>
+      {children}
+    </button>
   );
 }
 
@@ -506,30 +544,39 @@ function ProductForm({ product, categories, onClose, onSaved }: { product: Produ
   );
 }
 
+const ADJ_TYPES = [
+  { k: "INCREASE", label: "Increase", sign: "+", on: "bg-emerald-600" },
+  { k: "DECREASE", label: "Decrease", sign: "−", on: "bg-amber-600" },
+  { k: "DAMAGE", label: "Damage", sign: "−", on: "bg-orange-600" },
+  { k: "LOSS", label: "Loss", sign: "−", on: "bg-red-600" },
+] as const;
+type AdjType = (typeof ADJ_TYPES)[number]["k"];
+
 function StockModal({ product, onClose, onSaved }: { product: ProductDTO; onClose: () => void; onSaved: () => void }) {
   const router = useRouter();
-  const [error, setError] = useState("");
-  const [saving, setSaving] = useState(false);
   const hasVariants = product.variants.length > 0;
-  const [counts, setCounts] = useState<Record<string, number>>(
-    Object.fromEntries(product.variants.map((v) => [v.label, v.stock]))
-  );
-  const [single, setSingle] = useState(product.currentStock);
+  const [label, setLabel] = useState(hasVariants ? product.variants[0].label : "");
+  const [type, setType] = useState<AdjType>("INCREASE");
+  const [qty, setQty] = useState("");
+  const [reason, setReason] = useState("");
+  const [ref, setRef] = useState("");
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState("");
+
+  const current = hasVariants ? (product.variants.find((v) => v.label === label)?.stock ?? 0) : product.currentStock;
+  const q = Number(qty) || 0;
+  const delta = type === "INCREASE" ? q : -q;
+  const next = current + delta;
 
   async function save() {
     setError("");
+    if (q < 1) return setError("Enter a quantity (1 or more)");
+    if (reason.trim().length < 2) return setError("Please enter a reason");
+    if (next < 0) return setError(`Only ${current} in stock`);
     setSaving(true);
-    let bad: { ok: boolean; error?: string } = { ok: true };
-    if (hasVariants) {
-      for (const v of product.variants) {
-        const r = await adjustVariantStock({ id: product.id, label: v.label, newCount: counts[v.label] });
-        if (!r.ok) { bad = r; break; }
-      }
-    } else {
-      bad = await adjustStock({ id: product.id, newCount: single });
-    }
+    const r = await adjustStock({ id: product.id, label: hasVariants ? label : "", adjustmentType: type, quantity: q, reason: reason.trim(), referenceNo: ref.trim() });
     setSaving(false);
-    if (!bad.ok) return setError(bad.error ?? "Could not update");
+    if (!r.ok) return setError(r.error ?? "Could not update");
     router.refresh();
     onSaved();
   }
@@ -537,31 +584,51 @@ function StockModal({ product, onClose, onSaved }: { product: ProductDTO; onClos
   return (
     <Modal title={`Adjust stock — ${product.name}`} onClose={onClose}>
       <div className="flex flex-col gap-4">
-        {hasVariants ? (
-          <div className="flex flex-col gap-2">
-            <p className="text-sm text-gray-500">Set the stock for each size:</p>
-            {product.variants.map((v) => (
-              <div key={v.label} className="flex items-center gap-3">
-                <span className="w-16 rounded bg-gray-100 px-2 py-1 text-center text-sm font-medium">{v.label}</span>
-                <span className="text-xs text-gray-400">now {v.stock}</span>
-                <input type="number" min={0} value={counts[v.label] || ""} placeholder="0" onChange={(e) => setCounts((c) => ({ ...c, [v.label]: Math.max(0, Number(e.target.value)) }))} className={`${inputCls} ml-auto w-28`} />
-              </div>
+        {hasVariants && (
+          <Field label="Which variant">
+            <select value={label} onChange={(e) => setLabel(e.target.value)} className={inputCls}>
+              {product.variants.map((v) => <option key={v.label} value={v.label}>{v.label} — now {v.stock}</option>)}
+            </select>
+          </Field>
+        )}
+
+        <div>
+          <p className="mb-1.5 text-sm font-medium text-gray-700">Adjustment type</p>
+          <div className="grid grid-cols-4 gap-2">
+            {ADJ_TYPES.map((t) => (
+              <button key={t.k} type="button" onClick={() => setType(t.k)}
+                className={`rounded-lg border px-2 py-2 text-xs font-semibold transition ${type === t.k ? `${t.on} border-transparent text-white` : "border-gray-200 text-gray-600 hover:bg-gray-50"}`}>
+                {t.label}
+              </button>
             ))}
           </div>
-        ) : (
-          <>
-            <p className="text-sm text-gray-500">Current stock: <b>{product.currentStock} {product.unit}</b></p>
-            <Field label="New stock count">
-              <input type="number" min={0} value={single || ""} placeholder="0" onChange={(e) => setSingle(Math.max(0, Number(e.target.value)))} className={inputCls} autoFocus />
-            </Field>
-          </>
-        )}
-        <p className="text-xs text-gray-400">The difference is recorded as a stock adjustment in the ledger.</p>
+        </div>
+
+        <div className="grid grid-cols-2 gap-3">
+          <Field label="Quantity">
+            <input type="number" min={1} value={qty} placeholder="0" onChange={(e) => setQty(e.target.value)} className={inputCls} autoFocus />
+          </Field>
+          <Field label="Reference (optional)" hint="Invoice / audit / approval reference">
+            <input value={ref} onChange={(e) => setRef(e.target.value)} className={inputCls} />
+          </Field>
+        </div>
+
+        <Field label="Reason" hint="Required — why the stock is changing (e.g. recount, torn piece, theft).">
+          <input value={reason} onChange={(e) => setReason(e.target.value)} placeholder="e.g. Physical recount correction" className={inputCls} />
+        </Field>
+
+        <div className="flex items-center justify-center gap-3 rounded-xl bg-gray-50 py-3 text-sm">
+          <span className="font-semibold text-gray-700">Now {current}</span>
+          <span className="text-gray-400">→</span>
+          <span className={`font-bold ${next < 0 ? "text-red-600" : next < current ? "text-amber-600" : "text-emerald-600"}`}>New {next}</span>
+        </div>
+
+        <p className="text-xs text-gray-400">This is logged in the stock ledger with your name, the reason and the time.</p>
         {error && <p className="text-sm text-red-600">{error}</p>}
         <div className="flex justify-end gap-2">
-          <button type="button" onClick={onClose} className="rounded-lg border px-4 py-2 text-sm">Cancel</button>
-          <button onClick={save} disabled={saving} className="rounded-xl bg-gray-900 px-4 py-2 text-sm text-white disabled:opacity-50">
-            {saving ? "Saving…" : "Update stock"}
+          <button type="button" onClick={onClose} className="rounded-full border border-gray-300 px-4 py-2 text-sm">Cancel</button>
+          <button onClick={save} disabled={saving} className="rounded-full bg-brand-600 px-5 py-2 text-sm font-semibold text-white hover:bg-brand-700 disabled:opacity-50">
+            {saving ? "Saving…" : "Apply adjustment"}
           </button>
         </div>
       </div>
@@ -569,95 +636,114 @@ function StockModal({ product, onClose, onSaved }: { product: ProductDTO; onClos
   );
 }
 
+const READY_GST = ["0", "5", "12", "18", "28"];
+
 function ReadyModal({ product, onClose, onSaved }: { product: ProductDTO; onClose: () => void; onSaved: () => void }) {
   const hasVariants = product.variants.length > 0;
   const [error, setError] = useState("");
   const [saving, setSaving] = useState(false);
-  // Pre-fill with any existing prices so the user can just confirm or change them.
-  const [taxRate] = useState(String(product.taxRate ?? 0)); // kept from the product; edit it via Edit
-  const [singlePrice, setSinglePrice] = useState(product.salePrice > 0 ? String(toRupees(product.salePrice)) : "");
-  // Per-size prices, pre-filled with each size's price or the product fallback.
-  const [prices, setPrices] = useState<Record<string, string>>(
-    Object.fromEntries(product.variants.map((v) => [
-      v.label,
-      v.price != null ? String(toRupees(v.price)) : (product.salePrice > 0 ? String(toRupees(product.salePrice)) : ""),
-    ]))
+  const [gst, setGst] = useState(String(product.taxRate ?? 0));
+  const [singleSell, setSingleSell] = useState(product.salePrice > 0 ? String(toRupees(product.salePrice)) : "");
+  const [singleMrp, setSingleMrp] = useState(product.mrp != null ? String(toRupees(product.mrp)) : "");
+  const [sell, setSell] = useState<Record<string, string>>(
+    Object.fromEntries(product.variants.map((v) => [v.label, v.price != null ? String(toRupees(v.price)) : ""]))
   );
-  const hasExisting = hasVariants ? product.variants.some((v) => v.price != null) : product.salePrice > 0;
+  const [mrp, setMrp] = useState<Record<string, string>>(
+    Object.fromEntries(product.variants.map((v) => [v.label, v.mrp != null ? String(toRupees(v.mrp)) : ""]))
+  );
 
   async function save() {
     setError("");
     if (hasVariants) {
       for (const v of product.variants) {
-        if (!prices[v.label] || Number(prices[v.label]) <= 0) return setError(`Enter a price for size ${v.label}`);
+        if (!sell[v.label] || Number(sell[v.label]) <= 0) return setError(`Enter a selling price for ${v.label}`);
       }
-    } else if (!singlePrice || Number(singlePrice) <= 0) {
+    } else if (!singleSell || Number(singleSell) <= 0) {
       return setError("Enter a valid selling price");
     }
     setSaving(true);
     const res = await markReady({
       id: product.id,
-      salePriceRupees: hasVariants ? 0 : singlePrice,
-      taxRate,
-      variantPrices: hasVariants ? product.variants.map((v) => ({ label: v.label, priceRupees: prices[v.label] })) : undefined,
+      salePriceRupees: hasVariants ? 0 : singleSell,
+      mrpRupees: hasVariants ? undefined : (singleMrp || undefined),
+      taxRate: gst,
+      variantPrices: hasVariants
+        ? product.variants.map((v) => ({ label: v.label, priceRupees: sell[v.label], mrpRupees: mrp[v.label] || undefined }))
+        : undefined,
     });
     setSaving(false);
     if (!res.ok) return setError(res.error);
     onSaved();
   }
 
+  const costStr = product.costPrice > 0 ? formatINR(product.costPrice) : "—";
+
   return (
     <Modal title={`Ready to sell — ${product.name}`} onClose={onClose}>
       <div className="flex flex-col gap-4">
-        <p className="text-sm text-gray-500">
-          {hasExisting
-            ? "This already has a price — confirm it, or change it below. It then appears in billing."
-            : hasVariants
-              ? "Set the selling price for each size. It then appears in billing."
-              : "Set the price you'll sell this at. It then appears in billing."}
-        </p>
+        <p className="text-sm text-gray-500">Set the <b>selling price</b> (and MRP) so staff can bill it. Cost &amp; stock are shown for reference.</p>
+
+        <div className="grid grid-cols-3 gap-3">
+          <Stat label="Cost (bought at)" value={costStr} tone="amber" />
+          <Stat label="Total stock" value={`${product.currentStock} pcs`} tone="gray" />
+          <div>
+            <label className="mb-1 block text-xs font-medium text-gray-500">GST rate</label>
+            <select value={gst} onChange={(e) => setGst(e.target.value)} className={`${inputCls} w-full`}>
+              {READY_GST.map((r) => <option key={r} value={r}>{r}%</option>)}
+            </select>
+          </div>
+        </div>
+
+        {hasVariants ? (
+          <div className="overflow-hidden rounded-xl border border-gray-200">
+            <table className="w-full text-sm">
+              <thead className="bg-gray-50 text-left text-[11px] font-semibold uppercase tracking-wide text-gray-500">
+                <tr><th className="px-3 py-2">Variant</th><th className="px-2">Stock</th><th className="px-2">Cost</th><th className="px-2">MRP ₹</th><th className="px-2">Sell ₹</th></tr>
+              </thead>
+              <tbody className="divide-y divide-gray-100">
+                {product.variants.map((v) => (
+                  <tr key={v.label}>
+                    <td className="px-3 py-2 font-medium text-gray-700">{v.label}</td>
+                    <td className="px-2 text-gray-500">{v.stock}</td>
+                    <td className="px-2 text-gray-500">{costStr}</td>
+                    <td className="px-2"><input type="number" min={0} value={mrp[v.label] ?? ""} onChange={(e) => setMrp((m) => ({ ...m, [v.label]: e.target.value }))} placeholder="—" className={`${inputCls} w-20`} /></td>
+                    <td className="px-2"><input type="number" min={0} value={sell[v.label] ?? ""} onFocus={(e) => e.currentTarget.select()} onChange={(e) => setSell((s) => ({ ...s, [v.label]: e.target.value }))} placeholder="price" className={`${inputCls} w-20`} /></td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        ) : (
+          <div className="grid grid-cols-2 gap-3">
+            <Field label="MRP (₹)" hint="Printed max price (optional)">
+              <input type="number" min={0} value={singleMrp} onChange={(e) => setSingleMrp(e.target.value)} placeholder="e.g. 899" className={`${inputCls} w-full`} />
+            </Field>
+            <Field label="Selling price (₹)" hint="What the customer pays">
+              <input type="number" min={0} value={singleSell} onChange={(e) => setSingleSell(e.target.value)} placeholder="e.g. 599" className={`${inputCls} w-full`} autoFocus />
+            </Field>
+          </div>
+        )}
 
         {product.costPrice > 0 && (
           <p className="rounded-lg bg-amber-50 px-3 py-2 text-xs text-amber-700">
-            You bought this at <b>{formatINR(product.costPrice)}</b> per piece — set the selling price above this to make a profit.
+            Keep the selling price above the cost (<b>{costStr}</b>) to make a profit.
           </p>
         )}
-
-        {hasVariants ? (
-          <div className="flex flex-col gap-2">
-            <div className="flex items-center gap-3 text-[11px] font-semibold uppercase tracking-wide text-gray-400">
-              <span className="w-16 text-center">Size</span>
-              <span className="w-24">Bought at</span>
-              <span className="w-20">Stock</span>
-              <span className="ml-auto w-40">Sell price</span>
-            </div>
-            {product.variants.map((v) => (
-              <div key={v.label} className="flex items-center gap-3">
-                <span className="w-16 rounded bg-gray-100 px-2 py-1 text-center text-sm font-medium">{v.label}</span>
-                <span className="w-24 text-sm text-gray-700">{product.costPrice > 0 ? formatINR(product.costPrice) : "—"}</span>
-                <span className="w-20 text-xs text-gray-400">{v.stock} in stock</span>
-                <div className="relative ml-auto w-40">
-                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm text-gray-400">₹</span>
-                  <input type="number" step="0.01" min={0} value={prices[v.label] ?? ""} onFocus={(e) => e.currentTarget.select()}
-                    onChange={(e) => setPrices((p) => ({ ...p, [v.label]: e.target.value }))}
-                    placeholder="price" className={`${inputCls} w-full pl-7`} />
-                </div>
-              </div>
-            ))}
-          </div>
-        ) : (
-          <Field label="Selling price (₹)" hint="What the customer pays, per unit. You can still change it on each bill.">
-            <input type="number" step="0.01" min={0} value={singlePrice} onChange={(e) => setSinglePrice(e.target.value)} placeholder="e.g. 599" className={`${inputCls} w-full`} autoFocus />
-          </Field>
-        )}
-
-        <p className="text-xs text-gray-400">Tip: add HSN, category, GST rate or more sizes anytime via Edit.</p>
         {error && <p className="text-sm text-red-600">{error}</p>}
         <div className="flex justify-end gap-2">
-          <button type="button" onClick={onClose} className="rounded-lg border px-4 py-2 text-sm">Cancel</button>
-          <button onClick={save} disabled={saving} className="rounded-lg bg-green-600 px-4 py-2 text-sm text-white disabled:opacity-50">{saving ? "Saving…" : hasExisting ? "Confirm & make ready" : "Make ready to sell"}</button>
+          <button type="button" onClick={onClose} className="rounded-full border border-gray-300 px-4 py-2 text-sm">Cancel</button>
+          <button onClick={save} disabled={saving} className="rounded-full bg-emerald-600 px-5 py-2 text-sm font-semibold text-white hover:bg-emerald-700 disabled:opacity-50">{saving ? "Saving…" : "Make ready to sell"}</button>
         </div>
       </div>
     </Modal>
+  );
+}
+
+function Stat({ label, value, tone }: { label: string; value: string; tone: "amber" | "gray" }) {
+  return (
+    <div className={`rounded-xl border px-3 py-2 ${tone === "amber" ? "border-amber-100 bg-amber-50" : "border-gray-200 bg-gray-50"}`}>
+      <p className="text-[11px] font-medium text-gray-500">{label}</p>
+      <p className="text-sm font-bold text-gray-800">{value}</p>
+    </div>
   );
 }

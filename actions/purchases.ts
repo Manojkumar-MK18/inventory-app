@@ -29,15 +29,26 @@ export interface PurchaseListRow {
   supplierInvoiceNo: string;
   itemCount: number;
   totalCost: number;
+  paymentStatus: "UNPAID" | "PARTIAL" | "PAID";
+  dueAmount: number;
   itemText: string; // product names + codes, lower-cased, for search
 }
 
 export interface PurchaseDetail {
   id: string;
   date: string;
+  invoiceDate: string | null;
   supplierName: string;
   supplierInvoiceNo: string;
-  paymentMethod: string;
+  paymentStatus: "UNPAID" | "PARTIAL" | "PAID";
+  paymentMode: string;
+  amountPaid: number;
+  dueAmount: number;
+  subtotal: number;
+  otherCharges: number;
+  discountAmount: number;
+  referenceNo: string;
+  notes: string;
   totalCost: number;
   items: { productId: string; variantLabel: string; name: string; sku: string; qty: number; cost: number; lineTotal: number }[];
 }
@@ -63,6 +74,8 @@ export async function listPurchases(limit = 100): Promise<PurchaseListRow[]> {
     supplierInvoiceNo: p.supplierInvoiceNo || "",
     itemCount: p.items?.length ?? 0,
     totalCost: p.totalCost ?? 0,
+    paymentStatus: (p.paymentStatus ?? (p.paymentMethod === "CREDIT" ? "UNPAID" : "PAID")) as "UNPAID" | "PARTIAL" | "PAID",
+    dueAmount: p.dueAmount ?? (p.paymentMethod === "CREDIT" ? (p.totalCost ?? 0) : 0),
     itemText: (p.items ?? [])
       .map((i: any) => `${i.name ?? ""} ${i.productId ? skuById.get(i.productId.toString()) ?? "" : ""}`)
       .join(" ")
@@ -84,8 +97,15 @@ export async function createPurchase(raw: unknown): Promise<ActionResult> {
     await purchaseRepo(ctx).create({
       supplierName: d.supplierName || "",
       supplierInvoiceNo: d.supplierInvoiceNo || "",
-      paymentMethod: d.paymentMethod,
       date: d.dateYmd ? ymdToNoonIst(d.dateYmd) : undefined,
+      invoiceDate: d.invoiceDateYmd ? ymdToNoonIst(d.invoiceDateYmd) : null,
+      otherCharges: toPaise(d.otherChargesRupees ?? 0),
+      discountAmount: toPaise(d.discountRupees ?? 0),
+      paymentStatus: d.paymentStatus,
+      amountPaid: toPaise(d.amountPaidRupees ?? 0),
+      paymentMode: d.paymentMode,
+      referenceNo: d.referenceNo || "",
+      notes: d.notes || "",
       items: d.items.map((i) => ({ productId: i.productId, qty: i.qty, cost: toPaise(i.costRupees), variantLabel: i.variantLabel })),
     });
   } catch (e: any) {
@@ -115,9 +135,18 @@ export async function getPurchase(id: string): Promise<PurchaseDetail | null> {
   return {
     id: p._id.toString(),
     date: new Date(p.date).toISOString(),
+    invoiceDate: p.invoiceDate ? new Date(p.invoiceDate).toISOString() : null,
     supplierName: p.supplierName || "",
     supplierInvoiceNo: p.supplierInvoiceNo || "",
-    paymentMethod: p.paymentMethod || "PAID",
+    paymentStatus: (p.paymentStatus ?? (p.paymentMethod === "CREDIT" ? "UNPAID" : "PAID")) as "UNPAID" | "PARTIAL" | "PAID",
+    paymentMode: p.paymentMode ?? "CASH",
+    amountPaid: p.amountPaid ?? 0,
+    dueAmount: p.dueAmount ?? 0,
+    subtotal: p.subtotal ?? p.totalCost ?? 0,
+    otherCharges: p.otherCharges ?? 0,
+    discountAmount: p.discountAmount ?? 0,
+    referenceNo: p.referenceNo ?? "",
+    notes: p.notes ?? "",
     totalCost: p.totalCost ?? 0,
     items: (p.items ?? []).map((i: any) => ({
       productId: i.productId.toString(),
@@ -204,22 +233,37 @@ export async function editPurchase(raw: unknown): Promise<ActionResult> {
       for (const [pid, cost] of newCostByProduct) {
         await ProductModel.updateOne({ businessId: bId, _id: pid }, { $set: { costPrice: cost } }, { session });
       }
-      // Fix supplier dues: remove the old credit amount, add the new one.
-      if (old.paymentMethod === "CREDIT" && (old.supplierName || "").trim()) {
-        await SupplierModel.updateOne({ businessId: bId, name: { $regex: `^${supKey(old.supplierName)}$`, $options: "i" } }, { $inc: { balanceDue: -old.totalCost } }, { session });
+      // Recompute grand total + dues from the new payment info.
+      const newGrand = Math.max(0, newTotal + toPaise(d.otherChargesRupees ?? 0) - toPaise(d.discountRupees ?? 0));
+      const paid = toPaise(d.amountPaidRupees ?? 0);
+      const newDue = d.paymentStatus === "PAID" ? 0 : d.paymentStatus === "PARTIAL" ? Math.max(0, newGrand - paid) : newGrand;
+      const oldDue = old.dueAmount != null ? old.dueAmount : (old.paymentMethod === "CREDIT" ? old.totalCost : 0);
+
+      // Fix supplier dues: remove the old owed amount, add the new one.
+      if (oldDue > 0 && (old.supplierName || "").trim()) {
+        await SupplierModel.updateOne({ businessId: bId, name: { $regex: `^${supKey(old.supplierName)}$`, $options: "i" } }, { $inc: { balanceDue: -oldDue } }, { session });
       }
-      if (d.paymentMethod === "CREDIT" && (d.supplierName || "").trim()) {
+      if (newDue > 0 && (d.supplierName || "").trim()) {
         const name = d.supplierName!.trim();
         let sup = await SupplierModel.findOne({ businessId: bId, name: { $regex: `^${supKey(name)}$`, $options: "i" } }).session(session);
         if (!sup) { const c = await SupplierModel.create([{ businessId: bId, name }], { session }); sup = c[0]; }
-        await SupplierModel.updateOne({ businessId: bId, _id: sup._id }, { $inc: { balanceDue: newTotal } }, { session });
+        await SupplierModel.updateOne({ businessId: bId, _id: sup._id }, { $inc: { balanceDue: newDue } }, { session });
       }
       // Save the purchase row.
       old.items = newItems;
-      old.totalCost = newTotal;
+      old.subtotal = newTotal;
+      old.otherCharges = toPaise(d.otherChargesRupees ?? 0);
+      old.discountAmount = toPaise(d.discountRupees ?? 0);
+      old.totalCost = newGrand;
       old.supplierName = d.supplierName || "";
       old.supplierInvoiceNo = d.supplierInvoiceNo || "";
-      old.paymentMethod = d.paymentMethod;
+      old.paymentStatus = d.paymentStatus;
+      old.amountPaid = paid;
+      old.dueAmount = newDue;
+      old.paymentMode = d.paymentMode;
+      old.referenceNo = d.referenceNo || "";
+      old.notes = d.notes || "";
+      old.paymentMethod = newDue > 0 ? "CREDIT" : "PAID";
       await old.save({ session });
     });
   } finally {
@@ -280,12 +324,13 @@ export async function deletePurchase(id: string): Promise<ActionResult> {
           { session }
         );
       }
-      // Reverse supplier dues if this was a credit purchase.
-      if (p.paymentMethod === "CREDIT" && (p.supplierName || "").trim()) {
+      // Reverse whatever was still owed to the supplier for this purchase.
+      const due = p.dueAmount != null ? p.dueAmount : (p.paymentMethod === "CREDIT" ? p.totalCost : 0);
+      if (due > 0 && (p.supplierName || "").trim()) {
         const esc = p.supplierName.trim().replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
         await SupplierModel.updateOne(
           { businessId: bId, name: { $regex: `^${esc}$`, $options: "i" } },
-          { $inc: { balanceDue: -p.totalCost } },
+          { $inc: { balanceDue: -due } },
           { session }
         );
       }

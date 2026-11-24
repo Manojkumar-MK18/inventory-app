@@ -1,7 +1,7 @@
 import { Schema, model, models } from "mongoose";
 import { tenantPlugin } from "./plugins/tenant";
 
-export const PAYMENT_METHODS = ["CASH", "UPI", "CARD", "CREDIT"] as const;
+export const PAYMENT_METHODS = ["CASH", "UPI", "CARD", "CREDIT", "BANK", "CHEQUE"] as const;
 
 const paymentSchema = new Schema(
   {

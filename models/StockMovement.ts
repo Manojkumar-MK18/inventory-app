@@ -19,6 +19,9 @@ const stockMovementSchema = new Schema({
   qty: { type: Number, required: true }, // signed: +in, -out
   refType: { type: String }, // "SALE" | "PURCHASE" | ...
   refId: { type: Schema.Types.ObjectId },
+  reason: { type: String, default: "" }, // required for manual adjustments
+  referenceNo: { type: String, default: "" },
+  createdBy: { type: Schema.Types.ObjectId, ref: "User" },
   date: { type: Date, default: () => new Date() },
 });
 
